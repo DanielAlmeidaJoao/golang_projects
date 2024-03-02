@@ -1,0 +1,211 @@
+{
+    "processos": [
+        {
+            "tipo": "Candidaturas em Avaliação",
+            "mermaid": true,
+            "estados": [
+                {
+                    "label": "Total",
+                    "class": "StrongInfo",
+                    "estado": "( 1.* OR 2.* OR 3.* OR 4* OR 5*)",
+                    "temTotal": true
+                },
+                {
+                    "label": "1. Em Análise",
+                    "estado":  "1. Em Análise",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "2. Seleccionado para 1ª Fase",
+                    "estado":  "2. Seleccionado para 1ª Fase",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "3. Seleccionado para 2ª Fase",
+                    "estado":  "3. Seleccionado para 2ª Fase",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "4. Seleccionado para 3ª Fase",
+                    "estado":  "4. Seleccionado para 3ª Fase",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "4a. Aguarda conclusão da 3ª fase",
+                    "estado":  "4a. Aguarda conclusão da 3ª fase",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "5. Seleccionado para 4ª Fase",
+                    "estado":  "5. Seleccionado para 4ª Fase",
+                    "class": "StrongInfo",
+                    "temTotal": false
+                },
+                {
+                    "label": "5a. Aguarda conclusão da 4ª fase",
+                    "estado":  "5a. Aguarda conclusão da 4ª fase",
+                    "class": "StrongInfo",
+                    "temTo
+                    {
+                        "processos": [
+                            {
+                                "tipo": "Candidaturas em Avaliação",
+                                "mermaid": true,
+                                "estados": [
+                                    {
+                                        "label": "Total",
+                                        "class": "StrongInfo",
+                                        "estado": "( 1.* OR 2.* OR 3.* OR 4* OR 5*)",
+                                        "temTotal": true
+                                    },
+                                    {
+                                        "label": "1. Em Análise",
+                                        "estado":  "1. Em Análise",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "2. Seleccionado para 1ª Fase",
+                                        "estado":  "2. Seleccionado para 1ª Fase",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "3. Seleccionado para 2ª Fase",
+                                        "estado":  "3. Seleccionado para 2ª Fase",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "4. Seleccionado para 3ª Fase",
+                                        "estado":  "4. Seleccionado para 3ª Fase",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "4a. Aguarda conclusão da 3ª fase",
+                                        "estado":  "4a. Aguarda conclusão da 3ª fase",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "5. Seleccionado para 4ª Fase",
+                                        "estado":  "5. Seleccionado para 4ª Fase",
+                                        "class": "StrongInfo",
+                                        "temTotal": false
+                                    },
+                                    {
+                                        "label": "5a. Aguarda conclusão da 4ª fase",
+                                        "estado":  "5a. Aguarda conclusão da 4ª fase",
+                                        "class": "StrongInfo",
+                                        "temTo sasd{
+                                                       "processos": [
+                                                           {
+                                                               "tipo": "Candidaturas em Avaliação",
+                                                               "mermaid": true,
+                                                               "estados": [
+                                                                   {
+                                                                       "label": "Total",
+                                                                       "class": "StrongInfo",
+                                                                       "estado": "( 1.* OR 2.* OR 3.* OR 4* OR 5*)",
+                                                                       "temTotal": true
+                                                                   },
+                                                                   {
+                                                                       "label": "1. Em Análise",
+                                                                       "estado":  "1. Em Análise",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "2. Seleccionado para 1ª Fase",
+                                                                       "estado":  "2. Seleccionado para 1ª Fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "3. Seleccionado para 2ª Fase",
+                                                                       "estado":  "3. Seleccionado para 2ª Fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "4. Seleccionado para 3ª Fase",
+                                                                       "estado":  "4. Seleccionado para 3ª Fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "4a. Aguarda conclusão da 3ª fase",
+                                                                       "estado":  "4a. Aguarda conclusão da 3ª fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "5. Seleccionado para 4ª Fase",
+                                                                       "estado":  "5. Seleccionado para 4ª Fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTotal": false
+                                                                   },
+                                                                   {
+                                                                       "label": "5a. Aguarda conclusão da 4ª fase",
+                                                                       "estado":  "5a. Aguarda conclusão da 4ª fase",
+                                                                       "class": "StrongInfo",
+                                                                       "temTo
+                                                                       {
+                                                                           "processos": [
+                                                                               {
+                                                                                   "tipo": "Candidaturas em Avaliação",
+                                                                                   "mermaid": true,
+                                                                                   "estados": [
+                                                                                       {
+                                                                                           "label": "Total",
+                                                                                           "class": "StrongInfo",
+                                                                                           "estado": "( 1.* OR 2.* OR 3.* OR 4* OR 5*)",
+                                                                                           "temTotal": true
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "1. Em Análise",
+                                                                                           "estado":  "1. Em Análise",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "2. Seleccionado para 1ª Fase",
+                                                                                           "estado":  "2. Seleccionado para 1ª Fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "3. Seleccionado para 2ª Fase",
+                                                                                           "estado":  "3. Seleccionado para 2ª Fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "4. Seleccionado para 3ª Fase",
+                                                                                           "estado":  "4. Seleccionado para 3ª Fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "4a. Aguarda conclusão da 3ª fase",
+                                                                                           "estado":  "4a. Aguarda conclusão da 3ª fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "5. Seleccionado para 4ª Fase",
+                                                                                           "estado":  "5. Seleccionado para 4ª Fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTotal": false
+                                                                                       },
+                                                                                       {
+                                                                                           "label": "5a. Aguarda conclusão da 4ª fase",
+                                                                                           "estado":  "5a. Aguarda conclusão da 4ª fase",
+                                                                                           "class": "StrongInfo",
+                                                                                           "temTo sasd

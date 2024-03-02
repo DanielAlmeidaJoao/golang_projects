@@ -26,8 +26,6 @@ func connectionDown(err error) bool {
 	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
 }
 func handleConnection(conn net.Conn, endChan chan<- int) {
-	fmt.Printf("conn is %p\n", conn)
-	fmt.Println("conn is ", conn)
 
 	buffer := make([]byte, 1024*64) //dangerous
 	newFileName := time.Now().String() + conn.LocalAddr().String()
@@ -104,17 +102,15 @@ func main() {
 	}
 	for {
 		conn, err := listener.Accept()
-		println("SERVER ACCEPTED A CONNECTION:", conn.RemoteAddr().String())
+		println("SERVER ACCEPTED A CONNECTION:", conn.RemoteAddr())
 		if abort(err) {
 			return
 		}
 		sendChan := make(chan int)
 		receiveChan := make(chan int)
-		fmt.Printf("conn is %p\n", conn)
-		fmt.Println("conn is ", conn)
 
 		go handleConnection(conn, receiveChan)
-		//go sendFile(conn, sendChan)
+		go sendFile(conn, sendChan)
 		go func() {
 			sent, received := 0, 0
 			for {
