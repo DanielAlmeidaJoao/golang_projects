@@ -7,6 +7,7 @@ import (
 
 type CON_STATE int
 
+//todo
 const (
 	IN_CONNECTION_UP CON_STATE = iota
 	OUT_CONNECTION_UP
