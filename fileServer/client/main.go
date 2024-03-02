@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"syscall"
 )
 
 func abort(err error) bool {
@@ -28,7 +29,9 @@ func handleConnection(conn net.Conn) {
 		println("READ: ", str)
 	}
 }
-
+func connectionDown(err error) bool {
+	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
+}
 func main() {
 	totalRead := 0
 	conn, err := net.Dial("tcp", ":3000")
@@ -36,22 +39,22 @@ func main() {
 	if abort(err) {
 		return
 	}
-	//text := "TODAY IS A GOOD DAY! I CAN´T BELIEVE IT!!!"
-	//conn.Write([]byte(text))
 
-	buffer := make([]byte, 2024) //dangerous
-
+	buffer := make([]byte, 1024*64) //dangerous
+	written := -1
 	for {
 		readBytes, err := conn.Read(buffer)
 		totalRead += readBytes
-		if errors.Is(err, io.EOF) {
-			println("SERVER IS DOWN")
+		if connectionDown(err) {
+			println("REMOTE CONNECTION IS DOWN!")
 			return
 		}
-		abort(err)
-		println("CLIENT READ AND SENT: ", readBytes)
-		_, err = conn.Write(buffer[:readBytes])
-		abort(err)
+		println("DATA READ: ", totalRead)
+		written, err = conn.Write(buffer[:readBytes])
+		if connectionDown(err) {
+			return
+		}
+		println("DATA WRITTEN: ", written)
 	}
 
 }
