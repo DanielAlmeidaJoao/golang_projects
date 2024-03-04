@@ -1,26 +1,33 @@
 package protocolLIstenerLogics
 
 import (
-	"fileServer/commons"
+	commons2 "fileServer/protocolLIstenerLogics/commons"
 	"net"
 )
 
-type CON_STATE int
+type ConState int
 
-//todo
+// todo
 const (
-	IN_CONNECTION_UP CON_STATE = iota
+	IN_CONNECTION_UP ConState = iota
 	OUT_CONNECTION_UP
 	IN_CONNECTION_DOWN
 	OUT_CONNECTION_DOWN
+	MESSAGE_RECEIVED
 )
 
+type NetworkEvent struct {
+	From      net.Addr
+	Data      []byte
+	protoId   int16
+	eventType ConState
+	eventId   commons2.EventID
+}
 type ConnectionState struct {
 	address net.Addr
-	state   CON_STATE
+	state   ConState
 	err     error
 }
 type ProtoListener struct {
-	conStateChannel  chan ConnectionState // will receive the state of a connection, connection up or connection down
-	inMessageChannel chan commons.DataWrapper
+	protocols map[int16]Protocol
 }

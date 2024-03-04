@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strings"
 	"sync"
 	"syscall"
 )
@@ -31,22 +32,29 @@ type TCPChannel struct {
 func shutDown(c *TCPChannel) {
 	c.listener.Close()
 }
+func (c *TCPChannel) formatAddress() string {
+	return fmt.Sprintf("%s:%d", c.address, c.port)
+}
 func (c *TCPChannel) start() {
-	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%d", c.address, c.port))
+	listener, err := net.Listen("tcp", c.formatAddress())
 	abort(err)
 	c.listener = listener
 	go func() {
 		for {
 			conn, err := listener.Accept()
 			abort(err)
-			c.onConnected(conn)
+			c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port))
 		}
 	}()
 }
-func (c *TCPChannel) onConnected(conn net.Conn) {
+func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string) {
 	c.mu.Lock()
 	c.connections[conn.RemoteAddr().String()] = conn
 	c.mu.Unlock()
+	if strings.Compare("", listenAddress) == 0 {
+		//TODO SEND LISTEN ADDRESS
+		// LATER CHECH IF IT IS CLIENT | SERVER | P2P
+	}
 	c.readFromConnection(conn)
 }
 func (c *TCPChannel) closeConnection(connectionId string) {
@@ -63,16 +71,15 @@ func (c *TCPChannel) closeConnection(connectionId string) {
 func (c *TCPChannel) closeConnection2(conn net.Conn) {
 	c.closeConnection(conn.RemoteAddr().String())
 }
-func (c *TCPChannel) connect(address string, port int) {
+func (c *TCPChannel) connect(address string, port int, listenAddress string) {
 	go func() {
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", address, port))
 		if err != nil {
 			//TODO notify about the error
 			return
 		}
-		c.onConnected(conn)
+		c.onConnected(conn, listenAddress)
 	}()
-
 }
 func (c *TCPChannel) readFromConnection(conn net.Conn) {
 	for {
@@ -84,6 +91,18 @@ func (c *TCPChannel) readFromConnection(conn net.Conn) {
 		}
 	}
 }
+
+func (c *TCPChannel) sendMessage(ipAddress string, msg []byte) bool {
+	conn := c.connections[ipAddress]
+	if conn != nil {
+		written, err := conn.Write(msg)
+		connectionDown(err)
+		return written > 0
+		//written to logger service
+	}
+	return false
+}
+
 func connectionDown(err error) bool {
 	return errors.Is(err, io.EOF) || errors.Is(err, syscall.EPIPE)
 }
