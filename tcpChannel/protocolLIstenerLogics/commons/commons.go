@@ -1,3 +1,1 @@
-package commons
-
-type EventID int
+package localCommons

@@ -2,6 +2,7 @@ package channelsLogics
 
 import (
 	"errors"
+	"fileServer/protocolLIstenerLogics"
 	"fmt"
 	"io"
 	"net"
@@ -22,11 +23,12 @@ func abort(err error) bool {
 }
 
 type TCPChannel struct {
-	mu          sync.Mutex
-	connections map[string]net.Conn
-	address     string
-	port        int
-	listener    net.Listener
+	mu            sync.Mutex
+	connections   map[string]net.Conn
+	address       string
+	port          int
+	listener      net.Listener
+	protoListener protocolLIstenerLogics.ProtoListener
 }
 
 func shutDown(c *TCPChannel) {
@@ -43,18 +45,21 @@ func (c *TCPChannel) start() {
 		for {
 			conn, err := listener.Accept()
 			abort(err)
-			c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port))
+			c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), protocolLIstenerLogics.IN_CONNECTION_UP)
 		}
 	}()
 }
-func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string) {
+func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, inConnection protocolLIstenerLogics.ConState) {
 	c.mu.Lock()
 	c.connections[conn.RemoteAddr().String()] = conn
 	c.mu.Unlock()
 	if strings.Compare("", listenAddress) == 0 {
 		//TODO SEND LISTEN ADDRESS
-		// LATER CHECH IF IT IS CLIENT | SERVER | P2P
+		// LATER CHECK IF IT IS CLIENT | SERVER | P2P
 	}
+	//TODO should all protocols receive connection up event ??
+	connectionUp := protocolLIstenerLogics.NewNetworkEvent(conn.RemoteAddr(), nil, -1, inConnection, -1)
+	c.protoListener.DeliverEvent(connectionUp)
 	c.readFromConnection(conn)
 }
 func (c *TCPChannel) closeConnection(connectionId string) {
@@ -78,7 +83,7 @@ func (c *TCPChannel) connect(address string, port int, listenAddress string) {
 			//TODO notify about the error
 			return
 		}
-		c.onConnected(conn, listenAddress)
+		c.onConnected(conn, listenAddress, protocolLIstenerLogics.OUT_CONNECTION_UP)
 	}()
 }
 func (c *TCPChannel) readFromConnection(conn net.Conn) {

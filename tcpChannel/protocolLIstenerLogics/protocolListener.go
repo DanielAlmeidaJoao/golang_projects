@@ -1,11 +1,11 @@
 package protocolLIstenerLogics
 
 import (
-	commons2 "fileServer/protocolLIstenerLogics/commons"
 	"net"
 )
 
 type ConState int
+type eventHandlerId int //protocol handler id
 
 // todo
 const (
@@ -19,15 +19,35 @@ const (
 type NetworkEvent struct {
 	From      net.Addr
 	Data      []byte
-	protoId   int16
-	eventType ConState
-	eventId   commons2.EventID
+	ProtoId   int16
+	EventType ConState
+	EventId   eventHandlerId
 }
+
+func NewNetworkEvent(from net.Addr, data []byte, protoId int16, eventType ConState, eventId eventHandlerId) *NetworkEvent {
+	return &NetworkEvent{
+		From:      from,
+		Data:      data,
+		ProtoId:   protoId,
+		EventType: eventType,
+		EventId:   eventId,
+	}
+}
+
 type ConnectionState struct {
 	address net.Addr
 	state   ConState
 	err     error
 }
 type ProtoListener struct {
-	protocols map[int16]Protocol
+	protocols map[int16]*Protocol
+}
+
+func (l *ProtoListener) DeliverEvent(event *NetworkEvent) {
+	protocol := l.protocols[event.ProtoId]
+	if protocol == nil {
+		//TODO log errror msg. MSG NOT BEING PROCESSED
+	} else {
+		protocol.eventQueue <- event
+	}
 }
