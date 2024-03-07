@@ -1,17 +1,20 @@
 package channelsLogics
 
 import (
+	"bytes"
+	"encoding/binary"
 	"errors"
 	"fileServer/protocolLIstenerLogics"
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"strings"
 	"sync"
 	"syscall"
 )
 
-const MAX_BYTES_TO_READ = 64 * 1024
+const MAX_BYTES_TO_READ = 2 * 1024
 
 func abort(err error) bool {
 	if err == nil {
@@ -22,15 +25,45 @@ func abort(err error) bool {
 	}
 }
 
+type CONNECTION_TYPE int8
+
+const (
+	P2P CONNECTION_TYPE = iota
+	CLIENT
+	SERVER
+)
+
+type MSG_TYPE uint8
+
+var NOT_CONNECTED = errors.New("NOT_CONNECTED")
+var UNEXPECTED_NETWORK_READ_DATA = errors.New("UNEXPECTED_NETWORK_READ_DATA")
+
+const (
+	LISTEN_ADDRESS_MSG MSG_TYPE = iota
+	APP_MSG
+)
+
 type TCPChannel struct {
-	mu            sync.Mutex
-	connections   map[string]net.Conn
-	address       string
-	port          int
-	listener      net.Listener
-	protoListener protocolLIstenerLogics.ProtoListener
+	mu             sync.Mutex
+	connections    map[string]net.Conn
+	address        string
+	port           int
+	listener       net.Listener
+	protoListener  protocolLIstenerLogics.ProtoListener
+	connectionType CONNECTION_TYPE
 }
 
+func NewTCPChannel(address string, port int, protoListener protocolLIstenerLogics.ProtoListener, connectionType CONNECTION_TYPE) *TCPChannel {
+	channel := &TCPChannel{
+		connections:    make(map[string]net.Conn),
+		address:        address,
+		port:           port,
+		protoListener:  protoListener,
+		connectionType: connectionType,
+	}
+	channel.start()
+	return channel
+}
 func shutDown(c *TCPChannel) {
 	c.listener.Close()
 }
@@ -49,10 +82,27 @@ func (c *TCPChannel) start() {
 		}
 	}()
 }
+func ToByteNetworkData(msgType MSG_TYPE, data []byte) []byte {
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, msgType)
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+		os.Exit(1)
+	}
+	buf.Write(data)
+	//netData := make([] byte,1+len(data))
+	return buf.Bytes()
+}
+
+func (c *TCPChannel) toByteMSG(msgType MSG_TYPE, data []byte) {
+	//TODO sum := make([]byte, 1+len(data))
+	//append(sum, msgType...)
+}
 func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, inConnection protocolLIstenerLogics.ConState) {
 	c.mu.Lock()
 	c.connections[conn.RemoteAddr().String()] = conn
 	c.mu.Unlock()
+	//empty string, the user only wants to be a client
 	if strings.Compare("", listenAddress) == 0 {
 		//TODO SEND LISTEN ADDRESS
 		// LATER CHECK IF IT IS CLIENT | SERVER | P2P
@@ -60,6 +110,7 @@ func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, inConnecti
 	//TODO should all protocols receive connection up event ??
 	connectionUp := protocolLIstenerLogics.NewNetworkEvent(conn.RemoteAddr(), nil, -1, inConnection, -1)
 	c.protoListener.DeliverEvent(connectionUp)
+	//the protocols receive the connection when connection is up
 	c.readFromConnection(conn)
 }
 func (c *TCPChannel) closeConnection(connectionId string) {
@@ -86,26 +137,48 @@ func (c *TCPChannel) connect(address string, port int, listenAddress string) {
 		c.onConnected(conn, listenAddress, protocolLIstenerLogics.OUT_CONNECTION_UP)
 	}()
 }
+
 func (c *TCPChannel) readFromConnection(conn net.Conn) {
 	for {
-		buffer := make([]byte, MAX_BYTES_TO_READ)
-		_, err := conn.Read(buffer)
+		var datalen int
+		var err error
+		err = binary.Read(conn, binary.LittleEndian, &datalen)
+		if connectionDown(err) {
+
+		}
+		var msgCode MSG_TYPE
+		err = binary.Read(conn, binary.LittleEndian, &msgCode)
+		if connectionDown(err) {
+
+		}
+		buffer := make([]byte, datalen-1)
+		datalen, err = conn.Read(buffer)
+
 		if connectionDown(err) {
 			println("CLIENT CONNECTION IS DOWN!")
 			return
 		}
+		//TODO deliver event
 	}
 }
 
-func (c *TCPChannel) sendMessage(ipAddress string, msg []byte) bool {
+func (c *TCPChannel) sendMessage(ipAddress string, msg []byte, msgType MSG_TYPE) (int, error) {
+	//I DONT LIKE IT:
+	// using protoBuf to binary a struct with the data, msgType, ??
+	netData := ToByteNetworkData(msgType, msg)
 	conn := c.connections[ipAddress]
+	written := -1
+	var err error
 	if conn != nil {
-		written, err := conn.Write(msg)
+		written, err = conn.Write(netData)
 		connectionDown(err)
-		return written > 0
+		return written, err
 		//written to logger service
+	} else {
+		err = NOT_CONNECTED
 	}
-	return false
+
+	return written, err
 }
 
 func connectionDown(err error) bool {
