@@ -4,7 +4,9 @@ import (
 	"fmt"
 	gobabelUtils "gobabel/commons"
 	protoListener "gobabel/protocolLIstenerLogics"
+	"log"
 	"net"
+	"time"
 )
 
 /**
@@ -16,7 +18,9 @@ type ProtoInterface interface {
 	ConnectionDown(from *net.Addr, channelInterface *channel.ChannelInterface)
 }
 */
-
+func (p *ProtoEcho) sendMessage(address string, data string) (int, error) {
+	return p.channelInterface.SendAppData(address, p.ProtocolUniqueId(), p.ProtocolUniqueId(), []byte(data))
+}
 func NewEchoProto() *ProtoEcho {
 	return &ProtoEcho{
 		id: gobabelUtils.APP_PROTO_ID(45),
@@ -26,6 +30,7 @@ func NewEchoProto() *ProtoEcho {
 type ProtoEcho struct {
 	id               gobabelUtils.APP_PROTO_ID
 	channelInterface protoListener.ChannelInterface
+	serverAddr       string
 }
 
 func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
@@ -34,16 +39,18 @@ func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
 
 func (p *ProtoEcho) OnStart(channelInterface protoListener.ChannelInterface) {
 	p.channelInterface = channelInterface
+	log.Println("PROTOCOL STARTED: ", p.ProtocolUniqueId())
 }
 func (p *ProtoEcho) OnMessageArrival(from *net.Addr, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
 	str := string(msg)
-	fmt.Sprintf("RECEIVED MESSAGE FROM: ", (*from).String(), str)
+	fmt.Println("------------ RECEIVED MESSAGE FROM: -----------------", (*from).String(), str)
 }
 func (p *ProtoEcho) ConnectionUp(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Sprintf("CONNECTION IS UP", (*from).String())
+	fmt.Printf("CONNECTION IS UP. FROM <%s>\n", (*from).String())
+	p.serverAddr = (*from).String()
 }
 func (p *ProtoEcho) ConnectionDown(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Sprintf("CONNECTION IS DOW", (*from).String())
+	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", (*from).String())
 }
 
 func main() {
@@ -54,5 +61,19 @@ func main() {
 	pp.AddProtocol(proto)
 	pp.Start()
 
+	go func() {
+		for {
+			time.Sleep(time.Second * 10)
+			if proto.channelInterface.IsConnected(proto.serverAddr) {
+				now := time.Now()
+				str := fmt.Sprintf("TIME HERE IS %s", now.String())
+				result, err := proto.sendMessage(proto.serverAddr, str)
+				fmt.Println("CLIENT SENT THE MESSAGE. RESULT:", result, err, proto.serverAddr)
+			} else {
+				fmt.Println("NOT CONNECTED. CAN NOT SEND MESSAGES...")
+				return
+			}
+		}
+	}()
 	<-cc
 }
