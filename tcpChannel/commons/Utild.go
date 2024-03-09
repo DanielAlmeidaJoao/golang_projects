@@ -1,11 +1,43 @@
 package commons
 
 import (
-	"bytes"
-	"encoding/binary"
-	"fileServer/channelsLogics"
-	"log"
+	"errors"
 	"net"
+)
+
+var NOT_CONNECTED = errors.New("NOT_CONNECTED")
+var PROTOCOL_EXIST_ALREADY = errors.New("PROTOCOL_EXIST_ALREADY")
+var NO_PROTOCOLS_TO_RUN = errors.New("NO_PROTOCOLS_TO_RUN")
+
+type MessageHandlerID int //protocol handler id
+type APP_PROTO_ID uint16
+
+const ALL_PROTO_ID = 1
+
+// todo
+type NET_EVENT int
+
+const (
+	CONNECTION_UP NET_EVENT = iota
+	CONNECTION_DOWN
+	MESSAGE_RECEIVED
+)
+
+type CONNECTION_TYPE int8
+
+const (
+	P2P CONNECTION_TYPE = iota
+	CLIENT
+	SERVER
+)
+
+type MSG_TYPE uint8
+
+var UNEXPECTED_NETWORK_READ_DATA = errors.New("UNEXPECTED_NETWORK_READ_DATA")
+
+const (
+	LISTEN_ADDRESS_MSG MSG_TYPE = iota
+	APP_MSG
 )
 
 type DataWrapper struct {
@@ -14,29 +46,35 @@ type DataWrapper struct {
 	protoId int16
 }
 
-func ConvertDataToBinary(num any) ([]byte, error) {
-	buf := new(bytes.Buffer)
-	err := binary.Write(buf, binary.LittleEndian, num)
-	if err != nil {
-		log.Panicf("FAILED TO CONVERT DATA TO BINARY")
+const MAX_BYTES_TO_READ = 2 * 1024
+
+func Abort(err error) bool {
+	if err == nil {
+		return false
+	} else {
+		panic(err)
+		return true
 	}
-	//netData := make([] byte,1+len(data))
-	return buf.Bytes(), err
 }
 
-func ReadInt(from []byte, conn net.Conn) {
-	var dest int
-	err = binary.Read(conn, binary.LittleEndian, &dest)
+type NetworkEvent struct {
+	From             net.Addr
+	Data             []byte
+	SourceProto      APP_PROTO_ID
+	DestProto        APP_PROTO_ID
+	NET_EVENT        NET_EVENT
+	MessageHandlerID MessageHandlerID
 }
 
-func ToByteNetworkData(msgType channelsLogics.MSG_TYPE, data []byte) []byte {
-	msgLen, _ := ConvertDataToBinary(1 + len(data))
-	msgTypeBin, _ := ConvertDataToBinary(msgType)
-	totalLen := len(msgLen) + len(msgTypeBin) + len(data)
-	buf := new(bytes.Buffer)
-	buf.Grow(totalLen)
-	buf.Write(msgLen)
-	buf.Write(msgTypeBin)
-	buf.Write(data)
-	return buf.Bytes()
+type MsgHandlerFunc func(from net.Addr, data []byte, sourceProto APP_PROTO_ID, eventType NET_EVENT)
+
+func NewNetworkEvent(from net.Addr, data []byte, sourceProto, destProto APP_PROTO_ID, eventType NET_EVENT, messageHandlerID MessageHandlerID) *NetworkEvent {
+	return &NetworkEvent{
+		From:             from,
+		Data:             data,
+		SourceProto:      sourceProto,
+		DestProto:        destProto,
+		NET_EVENT:        eventType,
+		MessageHandlerID: messageHandlerID,
+	}
 }
