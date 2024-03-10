@@ -50,15 +50,17 @@ func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
 //TODO should all protocols receive connection up event ??
 func (l *ProtoListener) Start() error {
 	if len(l.protocols) == 0 {
+		log.Fatal(gobabelUtils.NO_PROTOCOLS_TO_RUN)
 		return gobabelUtils.NO_PROTOCOLS_TO_RUN
 	}
 	for _, protoWrapper := range l.protocols {
-
 		go func() {
 			proto := protoWrapper.proto
 			proto.OnStart(l.channel)
+			log.Printf("PROTOCOL <%d> STARTED LISTENING TO EVENTS...\n", proto.ProtocolUniqueId())
 			for {
 				networkEvent := <-protoWrapper.queue
+				log.Printf("PROTOCOL <%d> RECEIVED AN EVENT. EVENT TYPE <%d>\n", proto.ProtocolUniqueId(), networkEvent.NET_EVENT)
 				switch networkEvent.NET_EVENT {
 				case gobabelUtils.CONNECTION_UP:
 					proto.ConnectionUp(&networkEvent.From, l.channel)
@@ -82,17 +84,17 @@ func (l *ProtoListener) Start() error {
 //TODO should all protocols receive connection up event ??
 func (l *ProtoListener) DeliverEvent(event *gobabelUtils.NetworkEvent) {
 	if event.DestProto == gobabelUtils.ALL_PROTO_ID {
+		log.Default().Println("GOING TO DELIVER AN EVENT TO ALL PROTOCOLS")
 		for _, proto := range l.protocols {
 			proto.queue <- event
 		}
 	} else {
 		protocol := l.protocols[event.SourceProto]
 		if protocol == nil {
-			//TODO log errror msg. MSG NOT BEING PROCESSED
-			log.Println("RECEIVED EVENT FOR A NON EXISTENT PROTOCOL!")
+			log.Fatalln("RECEIVED EVENT FOR A NON EXISTENT PROTOCOL!")
 		} else {
+			log.Default().Println("GOING TO DELIVER AN EVENT TO THE PROTOCOL:", event.SourceProto)
 			protocol.queue <- event
 		}
 	}
-
 }

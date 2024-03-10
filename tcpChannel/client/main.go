@@ -5,6 +5,7 @@ import (
 	gobabelUtils "gobabel/commons"
 	protoListener "gobabel/protocolLIstenerLogics"
 	"net"
+	"time"
 )
 
 /**
@@ -26,6 +27,7 @@ func NewEchoProto() *ProtoEcho {
 type ProtoEcho struct {
 	id               gobabelUtils.APP_PROTO_ID
 	channelInterface protoListener.ChannelInterface
+	serverAddr       string
 }
 
 func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
@@ -34,25 +36,49 @@ func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
 
 func (p *ProtoEcho) OnStart(channelInterface protoListener.ChannelInterface) {
 	p.channelInterface = channelInterface
+	fmt.Println("PROTOCOL STARTED!!!")
+	p.channelInterface.OpenConnection("localhost", 3000, p.ProtocolUniqueId())
 }
 func (p *ProtoEcho) OnMessageArrival(from *net.Addr, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
 	str := string(msg)
-	fmt.Sprintf("RECEIVED MESSAGE FROM: ", (*from).String(), str)
+	fmt.Printf("****************************** RECEIVED MESSAGE FROM: %s \n", (*from).String(), str)
 }
 func (p *ProtoEcho) ConnectionUp(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Sprintf("CONNECTION IS UP", (*from).String())
+	fmt.Printf("CONNECTION IS UP", (*from).String())
+	p.serverAddr = (*from).String()
+	str := "A BRAVE NEW WORLD!"
+	res, er := p.channelInterface.SendAppData((*from).String(), p.ProtocolUniqueId(), p.ProtocolUniqueId(), []byte(str))
+	fmt.Println("MESSAGE SENT: ", res, er, len(str))
+}
+func (p *ProtoEcho) sendMessage(address string, data string) (int, error) {
+	return p.channelInterface.SendAppData(address, p.ProtocolUniqueId(), p.ProtocolUniqueId(), []byte(data))
 }
 func (p *ProtoEcho) ConnectionDown(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Sprintf("CONNECTION IS DOW", (*from).String())
+	fmt.Println("CONNECTION IS DOWN--", (*from).String())
 }
 
 func main() {
+	// go build ./...
 	cc := make(chan int)
 
-	pp := protoListener.NewProtocolListener("localhost", 3001, gobabelUtils.SERVER)
+	protocolsManager := protoListener.NewProtocolListener("localhost", 3001, gobabelUtils.SERVER)
 	proto := NewEchoProto()
-	pp.AddProtocol(proto)
-	pp.Start()
-	proto.channelInterface.SendAppData("localhost:3000", proto.ProtocolUniqueId(), proto.ProtocolUniqueId(), []byte("A BRAVE NEW WORLD!"))
+	protocolsManager.AddProtocol(proto)
+	protocolsManager.Start()
+
+	go func() {
+		for {
+			time.Sleep(time.Second * 10)
+			if proto.channelInterface.IsConnected(proto.serverAddr) {
+				now := time.Now()
+				str := fmt.Sprintf("TIME HERE IS %s", now.String())
+				result, err := proto.sendMessage(proto.serverAddr, str)
+				fmt.Println("CLIENT SENT THE MESSAGE. RESULT:", result, err, proto.serverAddr)
+			} else {
+				fmt.Println("NOT CONNECTED. CAN NOT SEND MESSAGES...")
+				return
+			}
+		}
+	}()
 	<-cc
 }
