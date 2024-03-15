@@ -2,17 +2,24 @@ package commons
 
 import (
 	"errors"
+	"gobabel/protocolLIstenerLogics"
 	"net"
 )
 
 var NOT_CONNECTED = errors.New("NOT_CONNECTED")
 var PROTOCOL_EXIST_ALREADY = errors.New("PROTOCOL_EXIST_ALREADY")
 var NO_PROTOCOLS_TO_RUN = errors.New("NO_PROTOCOLS_TO_RUN")
+var ELEMENT_EXISTS_ALREADY = errors.New("ELEMENT_EXISTS_ALREADY")
 
-type MessageHandlerID int //protocol handler id
+type MessageHandlerID uint16 //protocol handler id
+const NO_NETWORK_MESSAGE_HANDLER_ID MessageHandlerID = 0
+
 type APP_PROTO_ID uint16
 
 const ALL_PROTO_ID = 1
+
+// type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data []byte)
+type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data protocolLIstenerLogics.NetworkMessage)
 
 // todo
 type NET_EVENT int

@@ -15,6 +15,20 @@ func testDefer() {
 
 	ola = true
 }
+func testIntConversion() {
+	buf := new(bytes.Buffer)
+	var num int = 1
+	err := binary.Write(buf, binary.LittleEndian, num)
+
+	if err != nil {
+		fmt.Println("binary.Write failed:", err)
+	}
+
+	var dest int
+	err = binary.Read(buf, binary.LittleEndian, &dest)
+	println(err)
+	println("PRIGINAL IS:", dest)
+}
 func testBytesConversion() {
 	buf := new(bytes.Buffer)
 	var num uint8 = 1
@@ -75,10 +89,71 @@ func testGenerics() {
 
 	fmt.Println(event.eventId, event.data.name, event.data.age, event.data.weight)
 }
+
+func testComplex() {
+
+}
+
+type OLAINTERFACE interface {
+	sayOla() string
+	setOla(ol string) string
+}
+type ImplOla struct {
+	ola string
+}
+
+func (p *ImplOla) setOla(ol string) string {
+	p.ola = ol
+	return p.ola
+}
+
+func (p *ImplOla) sayOla() string {
+	return p.ola
+}
+
+type NetworkMessageDeserializer[T OLAINTERFACE] interface {
+	deserializeData(reader string) *T //make it return the
+}
+
+func changeInterfaceValue(olainterface OLAINTERFACE) {
+	olainterface.setOla("CARALHOO")
+}
+func changeInterfaceValue2(olainterface *OLAINTERFACE) {
+	(*olainterface).setOla("PORRASS")
+
+}
+func testOla() {
+	gg := ImplOla{
+		ola: "OLAKK",
+	}
+	hh := &gg
+	var jj OLAINTERFACE = hh
+
+	println(hh.sayOla())
+	println(gg.sayOla())
+
+	changeInterfaceValue(hh)
+	changeInterfaceValue2(&jj)
+
+	println(hh.sayOla())
+	println(gg.sayOla())
+
+}
+func testSlices() {
+	o := []int{0, 0, 0}
+	p := []int{1, 2, 3}
+	k := append(o, p...)
+	for i := range k {
+		println(k[i])
+	}
+}
 func main() {
 	//testDefer()
 	//testBytesConversion()
 	//testAppendConversion()
 	//testMapLen()
-	testGenerics()
+	//testGenerics()
+	//testIntConversion()
+	//testSlices()
+	testOla()
 }
