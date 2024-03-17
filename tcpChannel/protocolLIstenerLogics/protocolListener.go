@@ -1,10 +1,12 @@
 package protocolLIstenerLogics
 
 import (
+	"encoding/binary"
 	"fmt"
 	gobabelUtils "gobabel/commons"
 	"log"
 	"net"
+	"sync"
 )
 
 type ConnectionState struct {
@@ -15,31 +17,52 @@ type ConnectionState struct {
 type ProtoListenerInterface interface {
 	AddProtocol(protocol ProtoInterface) error
 	Start() error
+	RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE) error
 }
 type protoWrapper struct {
 	queue chan *gobabelUtils.NetworkEvent
 	proto ProtoInterface
 }
+type CustomPair[F any, S any] struct {
+	First  F
+	Second S
+}
 type ProtoListener struct {
+	mutex           sync.Mutex
 	protocols       map[gobabelUtils.APP_PROTO_ID]*protoWrapper
 	channel         ChannelInterface
-	messageHandlers map[gobabelUtils.MessageHandlerID]gobabelUtils.MESSAGE_HANDLER_TYPE
+	messageHandlers map[gobabelUtils.MessageHandlerID]*CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]
+	order           binary.ByteOrder
+	ConnectionType  gobabelUtils.CONNECTION_TYPE
 }
 
-func (p *ProtoListener) RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler gobabelUtils.MESSAGE_HANDLER_TYPE) error {
+/*********************** CLIENT METHODS ***************************/
+func (p *ProtoListener) RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE) error {
+	var err error
+	p.mutex.Lock()
 	if p.messageHandlers[handlerId] == nil {
-		p.messageHandlers[handlerId] = funcHandler
-		return nil
+		aux := &CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]{
+			First:  funcHandler,
+			Second: deserializer,
+		}
+		p.messageHandlers[handlerId] = aux
+		err = nil
+	} else {
+		err = gobabelUtils.ELEMENT_EXISTS_ALREADY
 	}
-	return gobabelUtils.ELEMENT_EXISTS_ALREADY
+	p.mutex.Unlock()
+	return err
 }
 
 // address string, port int, connectionType gobabelUtils.CONNECTION_TYPE
-func NewProtocolListener(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE) ProtoListenerInterface {
+func NewProtocolListener(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE, order binary.ByteOrder) ProtoListenerInterface {
 	ch := NewTCPChannel(address, port, connectionType)
 	protoL := &ProtoListener{
-		protocols: make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
-		channel:   ch,
+		protocols:       make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
+		channel:         ch,
+		order:           order,
+		messageHandlers: make(map[gobabelUtils.MessageHandlerID]*CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]),
+		ConnectionType:  connectionType,
 	}
 	ch.SetProtoLister(protoL)
 	return protoL
@@ -80,8 +103,9 @@ func (l *ProtoListener) Start() error {
 					if gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID == networkEvent.MessageHandlerID {
 						proto.OnMessageArrival(&networkEvent.From, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
 					} else {
-						messageHandler := l.messageHandlers[networkEvent.MessageHandlerID]
-						messageHandler(networkEvent.From.String(), networkEvent.SourceProto, networkEvent.Data)
+						pair := l.messageHandlers[networkEvent.MessageHandlerID]
+						netWorkMessage := pair.Second(NewCustomReader(networkEvent.Data, l.order))
+						pair.First(networkEvent.From.String(), networkEvent.SourceProto, netWorkMessage)
 					}
 				default:
 					(l.channel).CloseConnection(networkEvent.From.String())
@@ -95,6 +119,8 @@ func (l *ProtoListener) Start() error {
 	return nil
 
 }
+
+/*********************** CLIENT METHODS ***************************/
 
 // TODO should all protocols receive connection up event ??
 func (l *ProtoListener) DeliverEvent(event *gobabelUtils.NetworkEvent) {
