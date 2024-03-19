@@ -82,7 +82,10 @@ func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest 
 	c.mutex.Lock()
 	c.connections[conn.RemoteAddr().String()] = conn
 	c.mutex.Unlock()
+	fmt.Println("CONNECTION TO THE SERVER IS ON!!!", conn.RemoteAddr().String())
 	c.sendMessage(conn.RemoteAddr().String(), gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, []byte(listenAddress), gobabelUtils.LISTEN_ADDRESS_MSG, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
+	fmt.Println("SENT THE FIRST MESSAGE")
+
 	connectionUp := gobabelUtils.NewNetworkEvent(conn.RemoteAddr(), nil, protoDest, protoDest, gobabelUtils.CONNECTION_UP, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
 	c.protoListener.DeliverEvent(connectionUp)
 	//the protocols receive the connection when connection is up
@@ -124,6 +127,7 @@ func writeHeaders(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, ms
 	binary.Write(buf, binary.LittleEndian, uint16(source))
 	binary.Write(buf, binary.LittleEndian, uint16(destProto))
 	buf.Write([]byte{0, 0, 0, 0})
+	fmt.Println("::::::::::::::", msgType, msgHandlerId, source, destProto)
 	//binary.Write(buf, binary.LittleEndian, uint32(0))
 }
 
@@ -132,6 +136,11 @@ func writeHeaders(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, ms
 func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
 	conn := *aux
 	for {
+		/*
+			text := make([]byte, 64*64)
+			n, errrr := conn.Read(text)
+			println("RECEIVED ", n, errrr, base32.HexEncoding.EncodeToString(text[:n]))
+		*/
 		var err error
 		var msgCode uint8
 		err = binary.Read(conn, binary.LittleEndian, &msgCode)
@@ -178,6 +187,7 @@ func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
 			c.handleConnectionDown(aux, &err)
 			return
 		}
+		println("DO NOT DELIVER THIS ONENNNNNOOOOOOOOOOOOOÕ ", readData)
 		netEvent := gobabelUtils.MESSAGE_RECEIVED
 		if listenAddress == nil {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", string(buffer))
@@ -195,6 +205,7 @@ func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
 			}
 			buffer = nil
 		}
+		println("--------------------------------------------------------------------------")
 		msgEvent := gobabelUtils.NewNetworkEvent(listenAddress, buffer, gobabelUtils.APP_PROTO_ID(sourceProto), gobabelUtils.APP_PROTO_ID(destProto), netEvent, gobabelUtils.MessageHandlerID(msgHandlerId))
 		c.protoListener.DeliverEvent(msgEvent)
 	}
@@ -214,23 +225,43 @@ func (c *TCPChannel) SendAppData2(hostAddress string, source, destProto gobabelU
 func (c *TCPChannel) IsConnected(address string) bool {
 	return c.connections[address] != nil
 }
-
+func writeHeaders2(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) {
+	binary.Write(buf, binary.LittleEndian, uint8(msgType))
+	binary.Write(buf, binary.LittleEndian, uint16(msgHandlerId))
+	binary.Write(buf, binary.LittleEndian, uint16(source))
+	binary.Write(buf, binary.LittleEndian, uint16(destProto))
+	buf.Write([]byte{0, 0, 0, 0})
+	//binary.Write(buf, binary.LittleEndian, uint32(0))
+}
 func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
 	conn := c.connections[address]
 	written := -1
 	var err error
 	if conn != nil {
 		dataSize := uint32(writer.Len() - HeaderSize)
+		aux := writer.OffSet()
 		writer.SetOffSet(HeaderSize)
 		_ = binary.Write(writer, binary.LittleEndian, dataSize)
-		written, err = conn.Write(writer.data)
+		writer.SetOffSet(aux)
+		//println("SENT DATA IS ", base32.HexEncoding.EncodeToString(writer.Data()))
+		written, err = conn.Write(writer.Data())
+		reader := NewCustomReader(writer.Data(), binary.LittleEndian)
+		var msgtYPE uint8
+		reader.ReadAnyNumberWithSizeOnTheName(&msgtYPE)
+		var handler, source, dest uint16
+		var size uint32
+		reader.ReadAnyNumberWithSizeOnTheName(&handler)
+		reader.ReadAnyNumberWithSizeOnTheName(&source)
+		reader.ReadAnyNumberWithSizeOnTheName(&dest)
+
+		fmt.Println("TYPPPPPPPPP,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,", msgtYPE, handler, source, dest)
 		if connectionDown(&err) {
 			c.handleConnectionDown(&conn, &err)
 		}
 		return written, err
 		//written to logger service
 	} else {
-		err = gobabelUtils.NOT_CONNECTED
+		err = errors.New(fmt.Sprintf("%s IS NOT CONNECTED", address))
 	}
 	fmt.Println("GOING TO SEND MESSAGE")
 	return written, err
@@ -245,11 +276,7 @@ func (c *TCPChannel) sendMessage(hostAddress string, source, destProto gobabelUt
 	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
 	customWriter := NewCustomWriter3(binary.LittleEndian)
 	writeHeaders(customWriter, source, destProto, msgType, msgHandlerId)
-	err := binary.Write(customWriter, binary.LittleEndian, msg)
-	if err != nil {
-		log.Fatal("FAILED TO APPEND THE BINARY DATA!", err)
-		return 0, err
-	}
+	customWriter.Write(msg)
 	return c.auxWriteToNetwork(hostAddress, customWriter)
 }
 func (t *TCPChannel) handleConnectionDown(conn *net.Conn, err *error) {

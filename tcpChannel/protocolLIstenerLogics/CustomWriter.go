@@ -36,14 +36,15 @@ func NewCustomWriter3(order binary.ByteOrder) *CustomWriter {
 	return NewCustomWriter(64, order)
 }
 func (c *CustomWriter) Write(p []byte) (n int, err error) {
-	if len(p) > (cap(c.data) - len(c.data)) {
-		c.data = append(c.data, p...)
-		c.offset = len(c.data)
-	} else {
-		for i := range p {
-			c.data[c.offset] = p[i]
-			c.offset++
-		}
+	minCap := c.offset + len(p)
+	if minCap >= cap(c.data) {
+		aux := c.data
+		c.data = make([]byte, minCap+(minCap*1/3))
+		copy(c.data, aux)
+	}
+	for i := range p {
+		c.data[c.offset] = p[i]
+		c.offset++
 	}
 	return len(p), nil
 }
@@ -56,6 +57,9 @@ func (c *CustomWriter) WriteNumber(p any) (n int, err error) {
 func (c *CustomWriter) WriteString(p string) (n int, err error) {
 	old := c.offset
 	c.Write([]byte(p))
+	if err != nil {
+		return 0, err
+	}
 	return c.offset - old, nil
 }
 func (c *CustomWriter) SetOffSet(offSet int) int {
@@ -66,6 +70,14 @@ func (c *CustomWriter) SetOffSet(offSet int) int {
 	return c.offset
 }
 
+func (c *CustomWriter) OffSet() int {
+	return c.offset
+}
+
 func (c *CustomWriter) Len() int {
 	return len(c.data)
+}
+
+func (c *CustomWriter) Data() []byte {
+	return c.data[:c.offset]
 }

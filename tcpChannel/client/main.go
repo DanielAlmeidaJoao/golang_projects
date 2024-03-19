@@ -26,20 +26,23 @@ func main() {
 
 	cc := make(chan int)
 
-	protocolsManager := protoListener.NewProtocolListener("localhost", 3001, gobabelUtils.SERVER, binary.LittleEndian)
+	protocolsManager := protoListener.NewProtocolListener("localhost", 3002, gobabelUtils.SERVER, binary.LittleEndian)
 	proto := testUtils.NewEchoProto()
 	protocolsManager.AddProtocol(proto)
 	protocolsManager.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage, testUtils.DeserializeData)
 	protocolsManager.Start()
-	time.Sleep(time.Second * 10)
 
-	msg := testUtils.EchoMessage{
+	time.Sleep(time.Second * 3)
+	proto.ChannelInterface.OpenConnection("localhost", 3000, 45)
+	time.Sleep(time.Second * 5)
+
+	_ = testUtils.EchoMessage{
 		Data:  "SAY WHAAAAT ??",
 		Count: 134,
 	}
 	//	SendAppData2(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error)
-	result, er := proto.ChannelInterface.SendAppData2("localhost:3000", 45, 45, &msg, 2)
-	fmt.Println("RESULT IS: ", result, er)
+	//result, er := proto.ChannelInterface.SendAppData2(proto.ServerAddr, 45, 45, &msg, 2)
+	//fmt.Println("RESULT IS: ", result, er)
 	go func() {
 		for {
 			return
