@@ -54,6 +54,14 @@ func testAppendConversion() {
 	numbers = append(numbers, 123)
 	numbers = append(numbers, 99)
 
+	n := []int{1, 2, 3, 4, 5, 6}
+	n2 := make([]int, 10)
+	copy(n2, n)
+
+	fmt.Println("N2: IS :", n2)
+	copy(n2, n)
+	fmt.Println("N23: IS :", n2)
+
 	fmt.Println(numbers)
 
 }
@@ -150,10 +158,10 @@ func testSlices() {
 func main() {
 	//testDefer()
 	//testBytesConversion()
-	//testAppendConversion()
+	testAppendConversion()
 	//testMapLen()
 	//testGenerics()
 	//testIntConversion()
 	//testSlices()
-	testOla()
+	//testOla()
 }
