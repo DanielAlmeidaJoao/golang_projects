@@ -49,7 +49,7 @@ func (c *CustomWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-func (c *CustomWriter) WriteNumber(p any) (n int, err error) {
+func (c *CustomWriter) writeNumber(p any) (n int, err error) {
 	old := c.offset
 	er := binary.Write(c, c.order, p)
 	return c.offset - old, er
@@ -82,3 +82,44 @@ func (c *CustomWriter) Len() int {
 func (c *CustomWriter) Data() []byte {
 	return c.data[:c.offset]
 }
+
+func (c *CustomWriter) WriteByte(p byte) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteBool(p bool) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteInt8(p int8) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteUInt8(p uint8) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteInt16(p int16) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteUInt16(p uint16) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteInt32(p int32) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteUInt32(p uint32) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteInt64(p int64) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteUInt64(p int8) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteFloat32(p float32) (n int, err error) {
+	return c.writeNumber(p)
+}
+func (c *CustomWriter) WriteFloat64(p float64) (n int, err error) {
+	return c.writeNumber(p)
+}
+
+/*
+case bool, int8, uint8, int16, uint16, int16, int32, uint32, int64, uint64, float32,float64
+*/

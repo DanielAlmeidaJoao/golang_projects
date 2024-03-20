@@ -10,8 +10,8 @@ type EchoMessage struct {
 
 func (receiver *EchoMessage) SerializeData(writer *protoListener.CustomWriter) {
 	//TODO implement me
-	writer.WriteNumber(uint32(receiver.Count))
-	writer.WriteString(receiver.Data)
+	_, _ = writer.WriteUInt32(uint32(receiver.Count))
+	_, _ = writer.WriteString(receiver.Data)
 }
 
 func DeserializeData(reader *protoListener.CustomReader) *EchoMessage {
