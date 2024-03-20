@@ -44,13 +44,18 @@ func main() {
 	result, er := proto.ChannelInterface.SendAppData2(proto.ServerAddr, 45, 45, &msg, 2)
 	fmt.Println("RESULT IS: ", result, er)
 	go func() {
+		count := 0
 		for {
-			return
 			time.Sleep(time.Second * 10)
 			if proto.ChannelInterface.IsConnected(proto.ServerAddr) {
 				now := time.Now()
 				str := fmt.Sprintf("TIME HERE IS %s", now.String())
-				result, err := proto.SendMessage(proto.ServerAddr, str)
+				msg = testUtils.EchoMessage{
+					Data:  str,
+					Count: int32(count),
+				}
+				count++
+				result, err := proto.ChannelInterface.SendAppData2(proto.ServerAddr, 45, 45, &msg, 2)
 				fmt.Println("CLIENT SENT THE MESSAGE. RESULT:", result, err, proto.ServerAddr)
 			} else {
 				fmt.Println("NOT CONNECTED. CAN NOT SEND MESSAGES...")

@@ -36,7 +36,7 @@ func (p *ProtoEcho) ConnectionDown(from *net.Addr, channelInterface protoListene
 func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	fmt.Println("RECEIVED A MESSAGE FROM ", from)
 	msg := DeserializeData(data)
-	println("RECEIVED MESSAGE IS", msg.Data, msg.Count)
+	println("RECEIVED MESSAGE IS:", msg.Data, msg.Count)
 }
 func test() {
 	msg := EchoMessage{}
