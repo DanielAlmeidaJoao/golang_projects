@@ -121,13 +121,13 @@ func (c *TCPChannel) OpenConnection(address string, port int, protoSource gobabe
 		c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), protoSource)
 	}()
 }
-func writeHeaders(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) {
-	binary.Write(buf, binary.LittleEndian, uint8(msgType))
-	binary.Write(buf, binary.LittleEndian, uint16(msgHandlerId))
-	binary.Write(buf, binary.LittleEndian, uint16(source))
-	binary.Write(buf, binary.LittleEndian, uint16(destProto))
-	buf.Write([]byte{0, 0, 0, 0})
-	fmt.Println("::::::::::::::", msgType, msgHandlerId, source, destProto)
+func writeHeaders(buf *CustomWriter, source, destProto gobabelUtils.APP_PROTO_ID, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) {
+	_ = binary.Write(buf, binary.LittleEndian, uint8(msgType))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(msgHandlerId))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(source))
+	_ = binary.Write(buf, binary.LittleEndian, uint16(destProto))
+	buf.SetOffSet(buf.OffSet() + 4)
+	//fmt.Println("::::::::::::::", msgType, msgHandlerId, source, destProto)
 	//binary.Write(buf, binary.LittleEndian, uint32(0))
 }
 
@@ -136,11 +136,6 @@ func writeHeaders(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, ms
 func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
 	conn := *aux
 	for {
-		/*
-			text := make([]byte, 64*64)
-			n, errrr := conn.Read(text)
-			println("RECEIVED ", n, errrr, base32.HexEncoding.EncodeToString(text[:n]))
-		*/
 		var err error
 		var msgCode uint8
 		err = binary.Read(conn, binary.LittleEndian, &msgCode)
@@ -238,23 +233,28 @@ func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (in
 	written := -1
 	var err error
 	if conn != nil {
+		fmt.Println("çççççççççççllllllllllll_______________________________", writer.Len(), writer.offset)
+
 		dataSize := uint32(writer.Len() - HeaderSize)
 		aux := writer.OffSet()
-		writer.SetOffSet(HeaderSize)
+		writer.SetOffSet(HeaderSize - 4)
 		_ = binary.Write(writer, binary.LittleEndian, dataSize)
 		writer.SetOffSet(aux)
 		//println("SENT DATA IS ", base32.HexEncoding.EncodeToString(writer.Data()))
+		auxBuffer := writer.Data()
+		fmt.Println("ççççççççççç_______________________________", len(auxBuffer))
 		written, err = conn.Write(writer.Data())
 		reader := NewCustomReader(writer.Data(), binary.LittleEndian)
-		var msgtYPE uint8
-		reader.ReadAnyNumberWithSizeOnTheName(&msgtYPE)
-		var handler, source, dest uint16
-		var size uint32
-		reader.ReadAnyNumberWithSizeOnTheName(&handler)
-		reader.ReadAnyNumberWithSizeOnTheName(&source)
-		reader.ReadAnyNumberWithSizeOnTheName(&dest)
+		aux = reader.offset
+		msgtYPE, _ := reader.ReadUint8()
+		handler, _ := reader.ReadUint16()
+		source, _ := reader.ReadUint16()
+		dest, _ := reader.ReadUint16()
+		size, _ := reader.ReadUint32()
+		reader.SetOffset(aux)
+		fmt.Println("WRITTTTTTTEN IS ", written)
 
-		fmt.Println("TYPPPPPPPPP,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,", msgtYPE, handler, source, dest)
+		fmt.Println("TYPPPPPPPPP,,,,,,,,,,,,,,,,-----------,,,,,,,,,,,,,,,,,,,,,,,,", msgtYPE, handler, source, dest, size)
 		if connectionDown(&err) {
 			c.handleConnectionDown(&conn, &err)
 		}

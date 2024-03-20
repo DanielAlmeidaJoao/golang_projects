@@ -17,7 +17,7 @@ type ConnectionState struct {
 type ProtoListenerInterface interface {
 	AddProtocol(protocol ProtoInterface) error
 	Start() error
-	RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE) error
+	RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE) error
 }
 type protoWrapper struct {
 	queue chan *gobabelUtils.NetworkEvent
@@ -31,21 +31,17 @@ type ProtoListener struct {
 	mutex           sync.Mutex
 	protocols       map[gobabelUtils.APP_PROTO_ID]*protoWrapper
 	channel         ChannelInterface
-	messageHandlers map[gobabelUtils.MessageHandlerID]*CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]
+	messageHandlers map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE
 	order           binary.ByteOrder
 	ConnectionType  gobabelUtils.CONNECTION_TYPE
 }
 
 /*********************** CLIENT METHODS ***************************/
-func (p *ProtoListener) RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE) error {
+func (p *ProtoListener) RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE) error {
 	var err error
 	p.mutex.Lock()
 	if p.messageHandlers[handlerId] == nil {
-		aux := &CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]{
-			First:  funcHandler,
-			Second: deserializer,
-		}
-		p.messageHandlers[handlerId] = aux
+		p.messageHandlers[handlerId] = funcHandler
 		err = nil
 	} else {
 		err = gobabelUtils.ELEMENT_EXISTS_ALREADY
@@ -61,7 +57,7 @@ func NewProtocolListener(address string, port int, connectionType gobabelUtils.C
 		protocols:       make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
 		channel:         ch,
 		order:           order,
-		messageHandlers: make(map[gobabelUtils.MessageHandlerID]*CustomPair[MESSAGE_HANDLER_TYPE, MESSAGE_DESERIALIZER_TYPE]),
+		messageHandlers: make(map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE),
 		ConnectionType:  connectionType,
 	}
 	ch.SetProtoLister(protoL)
@@ -103,9 +99,8 @@ func (l *ProtoListener) Start() error {
 					if gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID == networkEvent.MessageHandlerID {
 						proto.OnMessageArrival(&networkEvent.From, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
 					} else {
-						pair := l.messageHandlers[networkEvent.MessageHandlerID]
-						netWorkMessage := pair.Second(NewCustomReader(networkEvent.Data, l.order))
-						pair.First(networkEvent.From.String(), networkEvent.SourceProto, netWorkMessage)
+						messageHandler := l.messageHandlers[networkEvent.MessageHandlerID]
+						messageHandler(networkEvent.From.String(), networkEvent.SourceProto, NewCustomReader(networkEvent.Data, l.order))
 					}
 				default:
 					(l.channel).CloseConnection(networkEvent.From.String())

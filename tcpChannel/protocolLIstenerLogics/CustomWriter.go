@@ -10,7 +10,7 @@ type NetworkMessage interface {
 }
 
 // type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data []byte)
-type MESSAGE_HANDLER_TYPE func(from string, protoSource gobabelUtils.APP_PROTO_ID, data NetworkMessage)
+type MESSAGE_HANDLER_TYPE func(from string, protoSource gobabelUtils.APP_PROTO_ID, data *CustomReader)
 
 type CustomWriter struct {
 	data   []byte
@@ -75,7 +75,8 @@ func (c *CustomWriter) OffSet() int {
 }
 
 func (c *CustomWriter) Len() int {
-	return len(c.data)
+	//len(c.data)
+	return c.offset
 }
 
 func (c *CustomWriter) Data() []byte {

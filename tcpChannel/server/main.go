@@ -21,7 +21,7 @@ type ProtoInterface interface {
 
 /** ****/
 
-//type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data protocolLIstenerLogics.NetworkMessage)
+// type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data protocolLIstenerLogics.NetworkMessage)
 func main() {
 	//go build ./...
 	fmt.Println("SERVER STARTED")
@@ -32,7 +32,7 @@ func main() {
 	pp.AddProtocol(proto)
 	fmt.Println("SERVER STARTED3")
 	//(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE)
-	pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage, testUtils.DeserializeData)
+	pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
 	fmt.Println("SERVER STARTED4")
 	pp.Start()
 	fmt.Println("SERVER STARTED5")

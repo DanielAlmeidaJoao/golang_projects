@@ -33,10 +33,17 @@ func (p *ProtoEcho) ConnectionUp(from *net.Addr, channelInterface protoListener.
 func (p *ProtoEcho) ConnectionDown(from *net.Addr, channelInterface protoListener.ChannelInterface) {
 	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", (*from).String())
 }
-func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data protoListener.NetworkMessage) {
+func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	fmt.Println("RECEIVED A MESSAGE FROM ", from)
+	msg := DeserializeData(data)
+	println("RECEIVED MESSAGE IS", msg.Data, msg.Count)
 }
-
+func test() {
+	msg := EchoMessage{}
+	var netMsg protoListener.NetworkMessage = &msg
+	msg2 := netMsg
+	println(msg2)
+}
 func (p *ProtoEcho) SendMessage(address string, data string) (int, error) {
 	return p.ChannelInterface.SendAppData(address, p.ProtocolUniqueId(), p.ProtocolUniqueId(), []byte(data))
 }

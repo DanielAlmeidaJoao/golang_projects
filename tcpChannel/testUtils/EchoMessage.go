@@ -14,7 +14,7 @@ func (receiver *EchoMessage) SerializeData(writer *protoListener.CustomWriter) {
 	writer.WriteString(receiver.Data)
 }
 
-func DeserializeData(reader *protoListener.CustomReader) protoListener.NetworkMessage {
+func DeserializeData(reader *protoListener.CustomReader) *EchoMessage {
 	count, _ := reader.ReadUint32()
 	str := string(reader.ReadAll())
 	aux := &EchoMessage{
