@@ -6,6 +6,13 @@ import (
 	"fmt"
 )
 
+func sayBlalalal() {
+	fmt.Println("HELLO, THE FUNCTION WAS TRIGGERED")
+}
+func testAfterFuncTime(data interface{}) {
+
+}
+
 func testDefer() {
 	ola := false
 
@@ -158,10 +165,11 @@ func testSlices() {
 func main() {
 	//testDefer()
 	//testBytesConversion()
-	testAppendConversion()
+	//testAppendConversion()
 	//testMapLen()
 	//testGenerics()
 	//testIntConversion()
 	//testSlices()
 	//testOla()
+	testAfterFuncTime()
 }

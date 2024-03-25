@@ -9,6 +9,7 @@ var NOT_CONNECTED = errors.New("NOT_CONNECTED")
 var PROTOCOL_EXIST_ALREADY = errors.New("PROTOCOL_EXIST_ALREADY")
 var NO_PROTOCOLS_TO_RUN = errors.New("NO_PROTOCOLS_TO_RUN")
 var ELEMENT_EXISTS_ALREADY = errors.New("ELEMENT_EXISTS_ALREADY")
+var UNKNOWN_PROTOCOL = errors.New("UNKNOWN_PROTOCOL_ID")
 
 type MessageHandlerID uint16 //protocol handler id
 const NO_NETWORK_MESSAGE_HANDLER_ID MessageHandlerID = 0
@@ -24,6 +25,7 @@ const (
 	CONNECTION_UP NET_EVENT = iota
 	CONNECTION_DOWN
 	MESSAGE_RECEIVED
+	ON_TIMER_TRIGGERED
 )
 
 type CONNECTION_TYPE int8
@@ -69,7 +71,22 @@ type NetworkEvent struct {
 	MessageHandlerID MessageHandlerID
 }
 
+type LocalCommunicationEvent struct {
+	sourceProto APP_PROTO_ID
+	destProto   APP_PROTO_ID
+	data        interface{}
+	funcHandler LocalProtoComHandlerFunc
+}
+
+func (l *LocalCommunicationEvent) ExecuteFunc() {
+	l.funcHandler(l.sourceProto, l.destProto, l.data)
+}
+
+// type TimerEvent
 type MsgHandlerFunc func(from net.Addr, data []byte, sourceProto APP_PROTO_ID, eventType NET_EVENT)
+
+type TimerHandlerFunc func(sourceProto APP_PROTO_ID, data interface{})
+type LocalProtoComHandlerFunc func(sourceProto, destProto APP_PROTO_ID, data interface{})
 
 func NewNetworkEvent(from net.Addr, data []byte, sourceProto, destProto APP_PROTO_ID, eventType NET_EVENT, messageHandlerID MessageHandlerID) *NetworkEvent {
 	return &NetworkEvent{
@@ -79,5 +96,13 @@ func NewNetworkEvent(from net.Addr, data []byte, sourceProto, destProto APP_PROT
 		DestProto:        destProto,
 		NET_EVENT:        eventType,
 		MessageHandlerID: messageHandlerID,
+	}
+}
+func NewLocalCommunicationEvent(sourceProto, destProto APP_PROTO_ID, data interface{}, funcHandler LocalProtoComHandlerFunc) *LocalCommunicationEvent {
+	return &LocalCommunicationEvent{
+		sourceProto: sourceProto,
+		destProto:   destProto,
+		data:        data,
+		funcHandler: funcHandler,
 	}
 }

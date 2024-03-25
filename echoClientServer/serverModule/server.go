@@ -10,7 +10,7 @@ func handleConnectin(conn net.Conn) {
 	fmt.Println("New connection from", conn.RemoteAddr())
 
 	for {
-		//io.ReadAll()
+		//io.ReadTheRest()
 		//io.Copy is blocking
 		buf := make([]byte, 2048)
 		n, err := conn.Read(buf)

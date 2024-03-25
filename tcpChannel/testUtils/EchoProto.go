@@ -38,6 +38,18 @@ func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROT
 	msg := DeserializeData(data)
 	println("RECEIVED MESSAGE IS:", msg.Data, msg.Count)
 }
+func (p *ProtoEcho) HandleMessage2(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", from)
+	msg := DeserializeDataRandomMSG(data)
+	println("RECEIVED RANDOM MESSAGE IS:", msg.Data, msg.Count)
+	fmt.Println("RANDOM NUMBER IS :", msg.Count)
+}
+
+func (p *ProtoEcho) HandleLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}) {
+	fmt.Println(p.id, " RECEIVED DATA ", sourceProto)
+	fmt.Println(sourceProto, destProto, data)
+}
+
 func test() {
 	msg := EchoMessage{}
 	var netMsg protoListener.NetworkMessage = &msg
@@ -50,5 +62,10 @@ func (p *ProtoEcho) SendMessage(address string, data string) (int, error) {
 func NewEchoProto() *ProtoEcho {
 	return &ProtoEcho{
 		id: gobabelUtils.APP_PROTO_ID(45),
+	}
+}
+func NewEchoProto2() *ProtoEcho {
+	return &ProtoEcho{
+		id: gobabelUtils.APP_PROTO_ID(50),
 	}
 }

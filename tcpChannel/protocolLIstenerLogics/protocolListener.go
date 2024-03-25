@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type ConnectionState struct {
@@ -18,20 +19,33 @@ type ProtoListenerInterface interface {
 	AddProtocol(protocol ProtoInterface) error
 	Start() error
 	RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE) error
+	RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
+	RegisterLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}, funcToExecute gobabelUtils.LocalProtoComHandlerFunc) error
+	CancelTimer(timerId int) bool
 }
 type protoWrapper struct {
-	queue chan *gobabelUtils.NetworkEvent
-	proto ProtoInterface
+	queue                   chan *gobabelUtils.NetworkEvent
+	timeoutChannel          chan int
+	localCommunicationQueue chan *gobabelUtils.LocalCommunicationEvent
+	proto                   ProtoInterface
 }
 type CustomPair[F any, S any] struct {
 	First  F
 	Second S
+}
+type timerArgs struct {
+	protoId     gobabelUtils.APP_PROTO_ID
+	data        interface{}
+	funcHandler gobabelUtils.TimerHandlerFunc
+	timer       *time.Timer
 }
 type ProtoListener struct {
 	mutex           sync.Mutex
 	protocols       map[gobabelUtils.APP_PROTO_ID]*protoWrapper
 	channel         ChannelInterface
 	messageHandlers map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE
+	timerHandlers   map[int]*timerArgs
+	timersId        int
 	order           binary.ByteOrder
 	ConnectionType  gobabelUtils.CONNECTION_TYPE
 }
@@ -55,6 +69,7 @@ func NewProtocolListener(address string, port int, connectionType gobabelUtils.C
 	ch := NewTCPChannel(address, port, connectionType)
 	protoL := &ProtoListener{
 		protocols:       make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
+		timerHandlers:   make(map[int]*timerArgs),
 		channel:         ch,
 		order:           order,
 		messageHandlers: make(map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE),
@@ -64,13 +79,48 @@ func NewProtocolListener(address string, port int, connectionType gobabelUtils.C
 	return protoL
 }
 
+func (l *ProtoListener) RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int {
+	aux := l.timersId
+	t := time.AfterFunc(duration, func() {
+		l.protocols[sourceProto].timeoutChannel <- aux
+	})
+	l.timerHandlers[l.timersId] = &timerArgs{
+		protoId:     sourceProto,
+		data:        data,
+		funcHandler: funcToExecute,
+		timer:       t,
+	}
+	l.timersId++
+	return aux
+}
+
+func (l *ProtoListener) RegisterLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}, funcToExecute gobabelUtils.LocalProtoComHandlerFunc) error {
+	proto := l.protocols[destProto]
+	if proto == nil {
+		return gobabelUtils.UNKNOWN_PROTOCOL
+	}
+	proto.localCommunicationQueue <- gobabelUtils.NewLocalCommunicationEvent(sourceProto, destProto, data, funcToExecute)
+	return nil
+}
+
+func (l *ProtoListener) CancelTimer(timerId int) bool {
+	args := l.timerHandlers[timerId]
+	if args != nil {
+		return args.timer.Stop()
+	}
+	return false
+}
+
 func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
+	//TODO make the constants dynamic
 	if l.protocols[(protocol).ProtocolUniqueId()] != nil {
 		return gobabelUtils.PROTOCOL_EXIST_ALREADY
 	}
 	l.protocols[(protocol).ProtocolUniqueId()] = &protoWrapper{
-		queue: make(chan *gobabelUtils.NetworkEvent, 20),
-		proto: protocol,
+		queue:                   make(chan *gobabelUtils.NetworkEvent, 50),
+		proto:                   protocol,
+		timeoutChannel:          make(chan int, 100),
+		localCommunicationQueue: make(chan *gobabelUtils.LocalCommunicationEvent, 20),
 	}
 	return nil
 }
@@ -88,23 +138,33 @@ func (l *ProtoListener) Start() error {
 			proto.OnStart(l.channel)
 			log.Printf("PROTOCOL <%d> STARTED LISTENING TO EVENTS...\n", proto.ProtocolUniqueId())
 			for {
-				networkEvent := <-protoWrapper.queue
-				log.Printf("PROTOCOL <%d> RECEIVED AN EVENT. EVENT TYPE <%d>\n", proto.ProtocolUniqueId(), networkEvent.NET_EVENT)
-				switch networkEvent.NET_EVENT {
-				case gobabelUtils.CONNECTION_UP:
-					proto.ConnectionUp(&networkEvent.From, l.channel)
-				case gobabelUtils.CONNECTION_DOWN:
-					proto.ConnectionDown(&networkEvent.From, l.channel)
-				case gobabelUtils.MESSAGE_RECEIVED:
-					if gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID == networkEvent.MessageHandlerID {
-						proto.OnMessageArrival(&networkEvent.From, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
-					} else {
-						messageHandler := l.messageHandlers[networkEvent.MessageHandlerID]
-						messageHandler(networkEvent.From.String(), networkEvent.SourceProto, NewCustomReader(networkEvent.Data, l.order))
+				select {
+				case networkEvent := <-protoWrapper.queue:
+					log.Printf("PROTOCOL <%d> RECEIVED AN EVENT. EVENT TYPE <%d>\n", proto.ProtocolUniqueId(), networkEvent.NET_EVENT)
+					switch networkEvent.NET_EVENT {
+					case gobabelUtils.CONNECTION_UP:
+						proto.ConnectionUp(&networkEvent.From, l.channel)
+					case gobabelUtils.CONNECTION_DOWN:
+						proto.ConnectionDown(&networkEvent.From, l.channel)
+					case gobabelUtils.MESSAGE_RECEIVED:
+						if gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID == networkEvent.MessageHandlerID {
+							proto.OnMessageArrival(&networkEvent.From, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
+						} else {
+							messageHandler := l.messageHandlers[networkEvent.MessageHandlerID]
+							messageHandler(networkEvent.From.String(), networkEvent.SourceProto, NewCustomReader(networkEvent.Data, l.order))
+						}
+					default:
+						(l.channel).CloseConnection(networkEvent.From.String())
+						log.Fatal(fmt.Sprintf("RECEIVED AN EVENT NOT PART OF THE PROTOCOL. CONNECTION CLOSED %s", networkEvent.From.String()))
 					}
-				default:
-					(l.channel).CloseConnection(networkEvent.From.String())
-					log.Fatal(fmt.Sprintf("RECEIVED AN EVENT NOT PART OF THE PROTOCOL. CONNECTION CLOSED %s", networkEvent.From.String()))
+				case timerId := <-protoWrapper.timeoutChannel:
+					args := l.timerHandlers[timerId]
+					if args != nil {
+						delete(l.timerHandlers, timerId)
+						args.funcHandler(args.protoId, args.data)
+					}
+				case localEventCom := <-protoWrapper.localCommunicationQueue:
+					localEventCom.ExecuteFunc()
 				}
 			}
 		}()

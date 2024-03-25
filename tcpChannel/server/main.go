@@ -28,11 +28,22 @@ func main() {
 	cc := make(chan int)
 	pp := protoListener.NewProtocolListener("localhost", 3000, gobabelUtils.SERVER, binary.LittleEndian)
 	proto := testUtils.NewEchoProto()
+	proto2 := testUtils.NewEchoProto2()
+
 	fmt.Println("SERVER STARTED2")
-	pp.AddProtocol(proto)
+	err := pp.AddProtocol(proto)
+	fmt.Println(err)
+	err = pp.AddProtocol(proto2)
+	fmt.Println(err)
+
 	fmt.Println("SERVER STARTED3")
 	//(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE)
-	pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
+	err1 := pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
+	err2 := pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(3), proto.HandleMessage2) //registar no server
+
+	err2 = pp.RegisterLocalCommunication(proto.ProtocolUniqueId(), proto2.ProtocolUniqueId(), 656, proto2.HandleLocalCommunication) //registar no server
+	fmt.Println(err2)
+	fmt.Println("ERROR REGISTERING MSG HANDLERS:", err1, err2)
 	fmt.Println("SERVER STARTED4")
 	pp.Start()
 	fmt.Println("SERVER STARTED5")

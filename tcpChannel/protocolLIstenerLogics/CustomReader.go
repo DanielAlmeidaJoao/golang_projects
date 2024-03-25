@@ -2,7 +2,6 @@ package protocolLIstenerLogics
 
 import (
 	"encoding/binary"
-	"fmt"
 )
 
 type MESSAGE_DESERIALIZER_TYPE func(reader *CustomReader) any
@@ -19,9 +18,7 @@ type CustomReader struct {
 }
 
 func (c *CustomReader) Read(p []byte) (n int, err error) {
-	fmt.Println("REading from the interface ", c.offset)
 	c.offset += copy(p, c.data[c.offset:])
-	fmt.Println("FINISHED REading from the interface ", c.offset)
 	return c.offset, nil
 }
 
@@ -34,8 +31,8 @@ func (b *CustomReader) ReadAnyNumberWithSizeOnTheName(dest any) error {
 	return err
 }
 
-func (b *CustomReader) ReadAll() []byte {
-	return b.data[:b.offset]
+func (b *CustomReader) ReadTheRest() []byte {
+	return b.data[b.offset:]
 }
 func (b *CustomReader) ReadString(n int) (string, error) {
 	//TODO check for error
@@ -110,7 +107,7 @@ func (b *CustomReader) ReadUInt64() (uint64, error) {
 	err := binary.Read(b, b.order, &num)
 	return num, err
 }
-func (b *CustomReader) Float32() (float32, error) {
+func (b *CustomReader) ReadFloat32() (float32, error) {
 	var num float32
 	err := binary.Read(b, b.order, &num)
 	return num, err
