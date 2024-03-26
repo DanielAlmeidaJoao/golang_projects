@@ -214,14 +214,7 @@ func (c *TCPChannel) SendAppData2(hostAddress string, source, destProto gobabelU
 func (c *TCPChannel) IsConnected(address string) bool {
 	return c.connections[address] != nil
 }
-func writeHeaders2(buf io.Writer, source, destProto gobabelUtils.APP_PROTO_ID, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) {
-	binary.Write(buf, binary.LittleEndian, uint8(msgType))
-	binary.Write(buf, binary.LittleEndian, uint16(msgHandlerId))
-	binary.Write(buf, binary.LittleEndian, uint16(source))
-	binary.Write(buf, binary.LittleEndian, uint16(destProto))
-	buf.Write([]byte{0, 0, 0, 0})
-	//binary.Write(buf, binary.LittleEndian, uint32(0))
-}
+
 func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
 	conn := c.connections[address]
 	written := -1

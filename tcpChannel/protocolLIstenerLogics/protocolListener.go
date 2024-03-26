@@ -22,6 +22,7 @@ type ProtoListenerInterface interface {
 	RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
 	RegisterLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}, funcToExecute gobabelUtils.LocalProtoComHandlerFunc) error
 	CancelTimer(timerId int) bool
+	RegisterPeriodicTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
 }
 type protoWrapper struct {
 	queue                   chan *gobabelUtils.NetworkEvent
@@ -34,10 +35,11 @@ type CustomPair[F any, S any] struct {
 	Second S
 }
 type timerArgs struct {
-	protoId     gobabelUtils.APP_PROTO_ID
-	data        interface{}
-	funcHandler gobabelUtils.TimerHandlerFunc
-	timer       *time.Timer
+	protoId       gobabelUtils.APP_PROTO_ID
+	data          interface{}
+	funcHandler   gobabelUtils.TimerHandlerFunc
+	timer         *time.Timer
+	periodicTimer *time.Ticker
 }
 type ProtoListener struct {
 	mutex           sync.Mutex
@@ -66,6 +68,7 @@ func (p *ProtoListener) RegisterNetworkMessageHandler(handlerId gobabelUtils.Mes
 
 // address string, port int, connectionType gobabelUtils.CONNECTION_TYPE
 func NewProtocolListener(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE, order binary.ByteOrder) ProtoListenerInterface {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	ch := NewTCPChannel(address, port, connectionType)
 	protoL := &ProtoListener{
 		protocols:       make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
@@ -94,6 +97,26 @@ func (l *ProtoListener) RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, d
 	return aux
 }
 
+// I DONT LIKE IT BECAUSE FOR EACH TIMER I NEED TO HAVE A GOROUTINE
+func (l *ProtoListener) RegisterPeriodicTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int {
+	ticker := time.NewTicker(duration)
+	aux := l.timersId
+	go func() {
+		for range ticker.C {
+			l.protocols[sourceProto].timeoutChannel <- aux
+		}
+	}()
+	l.timerHandlers[l.timersId] = &timerArgs{
+		protoId:       sourceProto,
+		data:          data,
+		funcHandler:   funcToExecute,
+		timer:         nil,
+		periodicTimer: ticker,
+	}
+	l.timersId++
+	return aux
+}
+
 func (l *ProtoListener) RegisterLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}, funcToExecute gobabelUtils.LocalProtoComHandlerFunc) error {
 	proto := l.protocols[destProto]
 	if proto == nil {
@@ -106,9 +129,13 @@ func (l *ProtoListener) RegisterLocalCommunication(sourceProto, destProto gobabe
 func (l *ProtoListener) CancelTimer(timerId int) bool {
 	args := l.timerHandlers[timerId]
 	if args != nil {
-		return args.timer.Stop()
+		if args.timer == nil {
+			args.periodicTimer.Stop()
+		} else {
+			args.timer.Stop()
+		}
 	}
-	return false
+	return true
 }
 
 func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
@@ -160,7 +187,10 @@ func (l *ProtoListener) Start() error {
 				case timerId := <-protoWrapper.timeoutChannel:
 					args := l.timerHandlers[timerId]
 					if args != nil {
-						delete(l.timerHandlers, timerId)
+						if args.timer != nil {
+							// it is a timeout, otherwise it is a periodic timer
+							delete(l.timerHandlers, timerId)
+						}
 						args.funcHandler(args.protoId, args.data)
 					}
 				case localEventCom := <-protoWrapper.localCommunicationQueue:

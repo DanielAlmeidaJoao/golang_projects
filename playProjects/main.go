@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 func sayBlalalal() {
@@ -162,7 +163,12 @@ func testSlices() {
 		println(k[i])
 	}
 }
+
+func testLogTrace() {
+	log.Println("ERROR HAPPENED ---")
+}
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	//testDefer()
 	//testBytesConversion()
 	//testAppendConversion()
@@ -171,5 +177,6 @@ func main() {
 	//testIntConversion()
 	//testSlices()
 	//testOla()
-	testAfterFuncTime()
+	//testAfterFuncTime()
+	testLogTrace()
 }
