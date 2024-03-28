@@ -25,7 +25,7 @@ type ProtoListenerInterface interface {
 	RegisterPeriodicTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
 }
 type protoWrapper struct {
-	queue                   chan *gobabelUtils.NetworkEvent
+	queue                   chan *NetworkEvent
 	timeoutChannel          chan int
 	localCommunicationQueue chan *gobabelUtils.LocalCommunicationEvent
 	proto                   ProtoInterface
@@ -144,7 +144,7 @@ func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
 		return gobabelUtils.PROTOCOL_EXIST_ALREADY
 	}
 	l.protocols[(protocol).ProtocolUniqueId()] = &protoWrapper{
-		queue:                   make(chan *gobabelUtils.NetworkEvent, 50),
+		queue:                   make(chan *NetworkEvent, 50),
 		proto:                   protocol,
 		timeoutChannel:          make(chan int, 100),
 		localCommunicationQueue: make(chan *gobabelUtils.LocalCommunicationEvent, 20),
@@ -170,19 +170,19 @@ func (l *ProtoListener) Start() error {
 					log.Printf("PROTOCOL <%d> RECEIVED AN EVENT. EVENT TYPE <%d>\n", proto.ProtocolUniqueId(), networkEvent.NET_EVENT)
 					switch networkEvent.NET_EVENT {
 					case gobabelUtils.CONNECTION_UP:
-						proto.ConnectionUp(&networkEvent.From, l.channel)
+						proto.ConnectionUp(networkEvent.customConn, l.channel)
 					case gobabelUtils.CONNECTION_DOWN:
-						proto.ConnectionDown(&networkEvent.From, l.channel)
+						proto.ConnectionDown(networkEvent.customConn, l.channel)
 					case gobabelUtils.MESSAGE_RECEIVED:
 						if gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID == networkEvent.MessageHandlerID {
-							proto.OnMessageArrival(&networkEvent.From, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
+							proto.OnMessageArrival(networkEvent.customConn, networkEvent.SourceProto, networkEvent.DestProto, networkEvent.Data, l.channel)
 						} else {
 							messageHandler := l.messageHandlers[networkEvent.MessageHandlerID]
-							messageHandler(networkEvent.From.String(), networkEvent.SourceProto, NewCustomReader(networkEvent.Data, l.order))
+							messageHandler(networkEvent.customConn, networkEvent.SourceProto, NewCustomReader(networkEvent.Data, l.order))
 						}
 					default:
-						(l.channel).CloseConnection(networkEvent.From.String())
-						log.Fatal(fmt.Sprintf("RECEIVED AN EVENT NOT PART OF THE PROTOCOL. CONNECTION CLOSED %s", networkEvent.From.String()))
+						(l.channel).CloseConnection(networkEvent.customConn.connectionKey)
+						log.Fatal(fmt.Sprintf("RECEIVED AN EVENT NOT PART OF THE PROTOCOL. CONNECTION CLOSED %s", networkEvent.customConn.remoteListenAddr.String()))
 					}
 				case timerId := <-protoWrapper.timeoutChannel:
 					args := l.timerHandlers[timerId]
@@ -208,7 +208,7 @@ func (l *ProtoListener) Start() error {
 /*********************** CLIENT METHODS ***************************/
 
 // TODO should all protocols receive connection up event ??
-func (l *ProtoListener) DeliverEvent(event *gobabelUtils.NetworkEvent) {
+func (l *ProtoListener) DeliverEvent(event *NetworkEvent) {
 	if event.DestProto == gobabelUtils.ALL_PROTO_ID {
 		log.Default().Println("GOING TO DELIVER AN EVENT TO ALL PROTOCOLS")
 		for _, proto := range l.protocols {

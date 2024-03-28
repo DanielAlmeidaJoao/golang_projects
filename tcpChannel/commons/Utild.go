@@ -1,6 +1,7 @@
 package commons
 
 import (
+	list2 "container/list"
 	"errors"
 	"net"
 )
@@ -62,15 +63,6 @@ func Abort(err error) bool {
 	}
 }
 
-type NetworkEvent struct {
-	From             net.Addr
-	Data             []byte
-	SourceProto      APP_PROTO_ID
-	DestProto        APP_PROTO_ID
-	NET_EVENT        NET_EVENT
-	MessageHandlerID MessageHandlerID
-}
-
 type LocalCommunicationEvent struct {
 	sourceProto APP_PROTO_ID
 	destProto   APP_PROTO_ID
@@ -88,16 +80,6 @@ type MsgHandlerFunc func(from net.Addr, data []byte, sourceProto APP_PROTO_ID, e
 type TimerHandlerFunc func(sourceProto APP_PROTO_ID, data interface{})
 type LocalProtoComHandlerFunc func(sourceProto, destProto APP_PROTO_ID, data interface{})
 
-func NewNetworkEvent(from net.Addr, data []byte, sourceProto, destProto APP_PROTO_ID, eventType NET_EVENT, messageHandlerID MessageHandlerID) *NetworkEvent {
-	return &NetworkEvent{
-		From:             from,
-		Data:             data,
-		SourceProto:      sourceProto,
-		DestProto:        destProto,
-		NET_EVENT:        eventType,
-		MessageHandlerID: messageHandlerID,
-	}
-}
 func NewLocalCommunicationEvent(sourceProto, destProto APP_PROTO_ID, data interface{}, funcHandler LocalProtoComHandlerFunc) *LocalCommunicationEvent {
 	return &LocalCommunicationEvent{
 		sourceProto: sourceProto,
@@ -105,4 +87,25 @@ func NewLocalCommunicationEvent(sourceProto, destProto APP_PROTO_ID, data interf
 		data:        data,
 		funcHandler: funcHandler,
 	}
+}
+
+func GetFromList(value any, list list2.List) *list2.Element {
+	if list.Len() == 0 {
+		return nil
+	}
+	i := 0
+	next := list.Front()
+	for i < list.Len() {
+		if next.Value == value {
+			return next
+		}
+		next = next.Next()
+		i++
+	}
+	return nil
+}
+
+func DeleteFromList(value any, list list2.List) any {
+	ele := GetFromList(value, list)
+	return list.Remove(ele)
 }

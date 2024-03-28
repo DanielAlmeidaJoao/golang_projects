@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	list2 "container/list"
 	"encoding/binary"
 	"fmt"
 	"log"
+	"net"
 )
 
 func sayBlalalal() {
@@ -167,6 +169,53 @@ func testSlices() {
 func testLogTrace() {
 	log.Println("ERROR HAPPENED ---")
 }
+func testList() {
+	list := list2.New()
+	list.PushBack(1)
+	list.PushBack(2)
+	list.PushBack(3)
+	list.PushBack(4)
+	list.PushBack(5)
+	list.PushBack(6)
+	elem := list.Front()
+	fmt.Println(elem.Value)
+
+	i := 0
+	next := list.Front()
+	var del *list2.Element
+	for i < list.Len() {
+		fmt.Println("ELEMENTS OF THE LIST: ", next.Value)
+		if next.Value == 2 {
+			del = next
+		}
+		next = next.Next()
+		i++
+	}
+	fmt.Println("REMOVED ELEMENT: ", list.Remove(del))
+	next = list.Front()
+	i = 0
+	for i < list.Len() {
+		fmt.Println("ELEMENTS OF THE LIST: ", next.Value)
+		next = next.Next()
+		i++
+	}
+}
+
+func testAddressesDifs() {
+	var ad map[net.Addr]int = make(map[net.Addr]int)
+
+	fmt.Println(ad)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "localhost:8080")
+	fmt.Println(tcpAddr, err)
+	tcpAddr2, err2 := net.ResolveTCPAddr("tcp", "127.0.0.1:8080")
+	fmt.Println(tcpAddr2, err2)
+	ad[tcpAddr] = 1232
+	fmt.Println(tcpAddr == tcpAddr2)
+	fmt.Println(tcpAddr.String() == tcpAddr2.String())
+	fmt.Println(tcpAddr2.String())
+	fmt.Println(ad[tcpAddr2])
+
+}
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	//testDefer()
@@ -178,5 +227,7 @@ func main() {
 	//testSlices()
 	//testOla()
 	//testAfterFuncTime()
-	testLogTrace()
+	//testLogTrace()
+	//testList()
+	testAddressesDifs()
 }

@@ -26,7 +26,7 @@ type ChannelInterface interface {
 
 func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE) *TCPChannel {
 	channel := &TCPChannel{
-		connections:    make(map[string]net.Conn),
+		connections:    make(map[string]*CustomConnection),
 		address:        address,
 		port:           port,
 		connectionType: connectionType,
@@ -35,9 +35,27 @@ func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECT
 	return channel
 }
 
+type CustomConnection struct {
+	conn             net.Conn
+	remoteListenAddr net.Addr
+	connectionKey    string
+}
+
+func (c *CustomConnection) RemoteAddress() net.Addr {
+	return c.remoteListenAddr
+}
+
+func (c *CustomConnection) GetConnectionKey() string {
+	return c.connectionKey
+}
+
+func (c *CustomConnection) Close() error {
+	return c.conn.Close()
+}
+
 type TCPChannel struct {
 	mutex          sync.Mutex
-	connections    map[string]net.Conn
+	connections    map[string]*CustomConnection //map[string]net.Conn  // connectionId, int_ip
 	address        string
 	port           int
 	listener       net.Listener
@@ -62,7 +80,10 @@ func (c *TCPChannel) start() {
 		for {
 			conn, err := listener.Accept()
 			gobabelUtils.Abort(err)
-			c.readFromConnection(&conn, nil)
+			customCon := &CustomConnection{
+				conn: conn,
+			}
+			c.readFromConnection(customCon, nil)
 			//c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), gobabelUtils.ALL_PROTO_ID, true)
 		}
 	}()
@@ -77,17 +98,40 @@ func (c *TCPChannel) onDisconnected(from string) {
 	delete(c.connections, from)
 	c.mutex.Unlock()
 }
-func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest gobabelUtils.APP_PROTO_ID) {
-	//senf the local listen address to the remote server
-	c.mutex.Lock()
-	c.connections[conn.RemoteAddr().String()] = conn
-	c.mutex.Unlock()
-	c.sendMessage(conn.RemoteAddr().String(), gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, []byte(listenAddress), gobabelUtils.LISTEN_ADDRESS_MSG, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
+func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, listenAddress net.Addr) *CustomConnection {
+	if customCon == nil {
+		customCon = &CustomConnection{
+			conn: conn,
+		}
+	}
 
-	connectionUp := gobabelUtils.NewNetworkEvent(conn.RemoteAddr(), nil, protoDest, protoDest, gobabelUtils.CONNECTION_UP, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
+	var addressKey string
+	if c.connections[listenAddress.String()] == nil {
+		addressKey = listenAddress.String()
+	} else {
+		addressKey = conn.RemoteAddr().String()
+	}
+	c.mutex.Lock()
+	c.connections[addressKey] = customCon
+	c.mutex.Unlock()
+	customCon.connectionKey = addressKey
+	customCon.remoteListenAddr = listenAddress
+	return customCon
+}
+func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest gobabelUtils.APP_PROTO_ID) {
+	//send the local listen address to the remote server
+	var customCon *CustomConnection
+	customCon = c.auxAddCon(nil, conn, conn.RemoteAddr())
+	_, err := c.sendMessage(customCon.connectionKey, gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, []byte(listenAddress), gobabelUtils.LISTEN_ADDRESS_MSG, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
+	if err != nil {
+		c.handleConnectionDown(customCon, &err)
+		return
+	}
+
+	connectionUp := NewNetworkEvent(customCon, nil, protoDest, protoDest, gobabelUtils.CONNECTION_UP, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
 	c.protoListener.DeliverEvent(connectionUp)
 	//the protocols receive the connection when connection is up
-	c.readFromConnection(&conn, conn.RemoteAddr())
+	c.readFromConnection(customCon, conn.RemoteAddr())
 	//empty string, the user only wants to be a client
 	if strings.Compare("", listenAddress) == 0 {
 		//TODO SEND LISTEN ADDRESS
@@ -113,10 +157,13 @@ func (c *TCPChannel) OpenConnection(address string, port int, protoSource gobabe
 	go func() {
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", address, port))
 		if err != nil {
-			//TODO notify about the error
-			return
+			customCon := &CustomConnection{
+				conn: conn, connectionKey: address, remoteListenAddr: conn.RemoteAddr(),
+			}
+			c.handleConnectionDown(customCon, &err)
+		} else {
+			c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), protoSource)
 		}
-		c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), protoSource)
 	}()
 }
 func writeHeaders(buf *CustomWriter, source, destProto gobabelUtils.APP_PROTO_ID, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) {
@@ -129,53 +176,53 @@ func writeHeaders(buf *CustomWriter, source, destProto gobabelUtils.APP_PROTO_ID
 
 //write order: msgType(uint8), sourceProto(uint16), destProto(uint16),dataLength(uint32),appData
 
-func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
-	conn := *aux
+func (c *TCPChannel) readFromConnection(customCon *CustomConnection, listenAddress net.Addr) {
+	conn := customCon.conn
 	for {
 		var err error
 		var msgCode uint8
 		err = binary.Read(conn, binary.LittleEndian, &msgCode)
 		if connectionDown(&err) || err != nil {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		var msgHandlerId uint16
 		err = binary.Read(conn, binary.LittleEndian, &msgHandlerId)
 		if connectionDown(&err) || err != nil {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 
 		var sourceProto uint16
 		err = binary.Read(conn, binary.LittleEndian, &sourceProto)
 		if connectionDown(&err) {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		var destProto uint16
 		err = binary.Read(conn, binary.LittleEndian, &destProto)
 		if connectionDown(&err) {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		var dataLen uint32
 		err = binary.Read(conn, binary.LittleEndian, &dataLen)
 		if connectionDown(&err) {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		buffer := make([]byte, dataLen)
 		var readData int
 		readData, err = conn.Read(buffer)
 		if connectionDown(&err) || err != nil {
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		if readData != int(dataLen) {
 			str := fmt.Sprintf("EXPECTED TO READ %d; BUT ONLY READ %d. CONN CLOSED", dataLen, readData)
 			err = errors.New(str)
 			fmt.Println(str)
-			c.handleConnectionDown(aux, &err)
+			c.handleConnectionDown(customCon, &err)
 			return
 		}
 		netEvent := gobabelUtils.MESSAGE_RECEIVED
@@ -183,19 +230,17 @@ func (c *TCPChannel) readFromConnection(aux *net.Conn, listenAddress net.Addr) {
 			tcpAddr, err := net.ResolveTCPAddr("tcp", string(buffer))
 			if err == nil {
 				log.Println("THE CLIENT REMOTE ADDRESS IS: ", tcpAddr.String())
-				c.mutex.Lock()
-				c.connections[tcpAddr.String()] = conn
-				c.mutex.Unlock()
+				c.auxAddCon(customCon, conn, tcpAddr)
 				listenAddress = tcpAddr
 				netEvent = gobabelUtils.CONNECTION_UP
 			} else {
+				_ = conn.Close()
 				log.Fatal("FAILED TO PARSE RECEIVED ADDRESS OF THE SERVER:", err)
-				conn.Close()
 				return
 			}
 			buffer = nil
 		}
-		msgEvent := gobabelUtils.NewNetworkEvent(listenAddress, buffer, gobabelUtils.APP_PROTO_ID(sourceProto), gobabelUtils.APP_PROTO_ID(destProto), netEvent, gobabelUtils.MessageHandlerID(msgHandlerId))
+		msgEvent := NewNetworkEvent(customCon, buffer, gobabelUtils.APP_PROTO_ID(sourceProto), gobabelUtils.APP_PROTO_ID(destProto), netEvent, gobabelUtils.MessageHandlerID(msgHandlerId))
 		c.protoListener.DeliverEvent(msgEvent)
 	}
 }
@@ -216,19 +261,19 @@ func (c *TCPChannel) IsConnected(address string) bool {
 }
 
 func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
-	conn := c.connections[address]
+	customCon := c.connections[address]
 	written := -1
 	var err error
-	if conn != nil {
+	if customCon != nil {
 		dataSize := uint32(writer.Len() - HeaderSize)
 		aux := writer.OffSet()
 		writer.SetOffSet(HeaderSize - 4)
 		_, _ = writer.WriteUInt32(dataSize)
 		writer.SetOffSet(aux)
 		//println("SENT DATA IS ", base32.HexEncoding.EncodeToString(writer.Data()))
-		written, err = conn.Write(writer.Data())
+		written, err = customCon.conn.Write(writer.Data())
 		if connectionDown(&err) {
-			c.handleConnectionDown(&conn, &err)
+			c.handleConnectionDown(customCon, &err)
 		}
 		return written, err
 		//written to logger service
@@ -249,12 +294,34 @@ func (c *TCPChannel) sendMessage(hostAddress string, source, destProto gobabelUt
 	customWriter.Write(msg)
 	return c.auxWriteToNetwork(hostAddress, customWriter)
 }
-func (t *TCPChannel) handleConnectionDown(conn *net.Conn, err *error) {
-	(*conn).Close()
-	t.onDisconnected((*conn).RemoteAddr().String())
-	msgEvent := gobabelUtils.NewNetworkEvent((*conn).RemoteAddr(), nil, gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, gobabelUtils.CONNECTION_DOWN, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
+func (t *TCPChannel) handleConnectionDown(customCon *CustomConnection, err *error) {
+	_ = customCon.conn.Close()
+	t.onDisconnected(customCon.connectionKey)
+	msgEvent := NewNetworkEvent(customCon, nil, gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, gobabelUtils.CONNECTION_DOWN, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
 	t.protoListener.DeliverEvent(msgEvent)
 }
 func connectionDown(err *error) bool {
 	return errors.Is(*err, io.EOF) || errors.Is(*err, syscall.EPIPE)
+}
+
+/******************* ******************* ******************* ******************* *******************/
+
+type NetworkEvent struct {
+	customConn       *CustomConnection
+	Data             []byte
+	SourceProto      gobabelUtils.APP_PROTO_ID
+	DestProto        gobabelUtils.APP_PROTO_ID
+	NET_EVENT        gobabelUtils.NET_EVENT
+	MessageHandlerID gobabelUtils.MessageHandlerID
+}
+
+func NewNetworkEvent(customCon *CustomConnection, data []byte, sourceProto, destProto gobabelUtils.APP_PROTO_ID, eventType gobabelUtils.NET_EVENT, messageHandlerID gobabelUtils.MessageHandlerID) *NetworkEvent {
+	return &NetworkEvent{
+		customConn:       customCon,
+		Data:             data,
+		SourceProto:      sourceProto,
+		DestProto:        destProto,
+		NET_EVENT:        eventType,
+		MessageHandlerID: messageHandlerID,
+	}
 }

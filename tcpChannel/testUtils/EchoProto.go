@@ -5,7 +5,6 @@ import (
 	gobabelUtils "gobabel/commons"
 	protoListener "gobabel/protocolLIstenerLogics"
 	"log"
-	"net"
 )
 
 type ProtoEcho struct {
@@ -16,6 +15,16 @@ type ProtoEcho struct {
 	listener         protoListener.ProtoListenerInterface
 }
 
+/*
+
+	ProtocolUniqueId() gobabelUtils.APP_PROTO_ID
+	OnStart(channelInterface ChannelInterface)
+	OnMessageArrival(customCon *customConnection, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface ChannelInterface)
+	ConnectionUp(customCon *customConnection, channelInterface ChannelInterface)
+	ConnectionDown(customCon *customConnection, channelInterface ChannelInterface)
+
+*/
+
 func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
 	return p.id
 }
@@ -24,16 +33,16 @@ func (p *ProtoEcho) OnStart(channelInterface protoListener.ChannelInterface) {
 	p.ChannelInterface = channelInterface
 	log.Println("PROTOCOL STARTED: ", p.ProtocolUniqueId())
 }
-func (p *ProtoEcho) OnMessageArrival(from *net.Addr, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
+func (p *ProtoEcho) OnMessageArrival(customCon *protoListener.CustomConnection, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
 	str := string(msg)
-	fmt.Println("------------ RECEIVED MESSAGE FROM: -----------------", (*from).String(), str)
+	fmt.Println("------------ RECEIVED MESSAGE FROM: -----------------", customCon.GetConnectionKey(), str)
 }
-func (p *ProtoEcho) ConnectionUp(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Printf("CONNECTION IS UP. FROM <%s>\n", (*from).String())
-	p.ServerAddr = (*from).String()
+func (p *ProtoEcho) ConnectionUp(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
+	fmt.Printf("CONNECTION IS UP. FROM <%s>\n", customCon.GetConnectionKey())
+	p.ServerAddr = customCon.GetConnectionKey()
 }
-func (p *ProtoEcho) ConnectionDown(from *net.Addr, channelInterface protoListener.ChannelInterface) {
-	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", (*from).String())
+func (p *ProtoEcho) ConnectionDown(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
+	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", customCon.GetConnectionKey())
 }
 func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
