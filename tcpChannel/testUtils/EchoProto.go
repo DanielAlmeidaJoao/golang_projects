@@ -13,6 +13,7 @@ type ProtoEcho struct {
 	ServerAddr       *protoListener.CustomConnection
 	Counter          int
 	listener         protoListener.ProtoListenerInterface
+	MessagesSent     map[int]*EchoMessage
 }
 
 /*
@@ -56,9 +57,13 @@ func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, pr
 		log.Println("ERROR SENDING DATA TO ANOTHER PROTO", err2)
 	}
 }
+func sameMsgs(m1, m2 *EchoMessage) bool {
+	return m1.Count == m2.Count && m1.Data == m2.Data
+}
 func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
-	log.Println("CLIENT RECEIVED MESSAGE IS:", msg.Data, msg.Count, customConn.GetConnectionKey())
+	m := p.MessagesSent[int(msg.Count)]
+	log.Println("CLIENT RECEIVED THE SAME MESSAGE ? ", sameMsgs(m, msg))
 }
 func (p *ProtoEcho) HandleMessage2(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", customConn.GetConnectionKey())
@@ -93,13 +98,15 @@ func (p *ProtoEcho) SendMessage(address string, data string) (int, error) {
 }
 func NewEchoProto(manager protoListener.ProtoListenerInterface) *ProtoEcho {
 	return &ProtoEcho{
-		id:       gobabelUtils.APP_PROTO_ID(45),
-		listener: manager,
+		id:           gobabelUtils.APP_PROTO_ID(45),
+		listener:     manager,
+		MessagesSent: make(map[int]*EchoMessage),
 	}
 }
 func NewEchoProto2(manager protoListener.ProtoListenerInterface) *ProtoEcho {
 	return &ProtoEcho{
-		id:       gobabelUtils.APP_PROTO_ID(50),
-		listener: manager,
+		id:           gobabelUtils.APP_PROTO_ID(50),
+		listener:     manager,
+		MessagesSent: make(map[int]*EchoMessage),
 	}
 }
