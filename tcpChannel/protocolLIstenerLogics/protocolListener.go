@@ -153,6 +153,7 @@ func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
 }
 
 // TODO should all protocols receive connection up event ??
+// TODO should a protocol be registered after all the protocols have already started
 func (l *ProtoListener) Start() error {
 	if len(l.protocols) == 0 {
 		log.Fatal(gobabelUtils.NO_PROTOCOLS_TO_RUN)

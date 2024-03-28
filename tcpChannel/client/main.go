@@ -39,7 +39,7 @@ func PeriodicTimerHandler(proto gobabelUtils.APP_PROTO_ID, message interface{}) 
 			Data:  localTime.String(),
 			Count: int32(protocol.Counter),
 		}
-		result, er := protocol.ChannelInterface.SendAppData2(protocol.ServerAddr, 45, 45, &msg, 2)
+		result, er := protocol.ChannelInterface.SendAppData2(protocol.ServerAddr.GetConnectionKey(), 45, 45, &msg, 2)
 		log.Println("MSG SENT AFTER TIMER: ", result, er)
 	} else {
 		log.Fatal("FAILED TO CAST OBJECT")
@@ -76,11 +76,13 @@ func main() {
 		Count: 134,
 	}
 	//SendAppData2(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error)
-	result, er := proto.ChannelInterface.SendAppData2(proto.ServerAddr, 45, 45, &msg, 2)
+	result, er := proto.ChannelInterface.SendAppData2(proto.ServerAddr.GetConnectionKey(), 45, 45, &msg, 2)
+	result, er = proto.ServerAddr.SendData2(45, 45, &msg, 2)
+
 	fmt.Println("RESULT IS: ", result, er)
 
-	protocolsManager.RegisterTimeout(proto.ProtocolUniqueId(), time.Second*5, &msg, TimerFunc1)
-	protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
+	//protocolsManager.RegisterTimeout(proto.ProtocolUniqueId(), time.Second*5, &msg, TimerFunc1)
+	//protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
 
 	<-cc
 }

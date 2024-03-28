@@ -10,7 +10,7 @@ import (
 type ProtoEcho struct {
 	id               gobabelUtils.APP_PROTO_ID
 	ChannelInterface protoListener.ChannelInterface
-	ServerAddr       string
+	ServerAddr       *protoListener.CustomConnection
 	Counter          int
 	listener         protoListener.ProtoListenerInterface
 }
@@ -39,16 +39,16 @@ func (p *ProtoEcho) OnMessageArrival(customCon *protoListener.CustomConnection, 
 }
 func (p *ProtoEcho) ConnectionUp(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
 	fmt.Printf("CONNECTION IS UP. FROM <%s>\n", customCon.GetConnectionKey())
-	p.ServerAddr = customCon.GetConnectionKey()
+	p.ServerAddr = customCon
 }
 func (p *ProtoEcho) ConnectionDown(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
 	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", customCon.GetConnectionKey())
 }
-func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
 	log.Println("RECEIVED MESSAGE IS:", msg.Data, msg.Count)
 	pair := &protoListener.CustomPair[string, *EchoMessage]{
-		First:  from,
+		First:  customConn.GetConnectionKey(),
 		Second: msg,
 	}
 	err2 := p.listener.RegisterLocalCommunication(p.ProtocolUniqueId(), 50, pair, p.Proto2GoingToReply) //registar no server
@@ -56,12 +56,12 @@ func (p *ProtoEcho) HandleMessage(from string, protoSource gobabelUtils.APP_PROT
 		log.Println("ERROR SENDING DATA TO ANOTHER PROTO", err2)
 	}
 }
-func (p *ProtoEcho) ClientHandleMessage(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
-	log.Println("CLIENT RECEIVED MESSAGE IS:", msg.Data, msg.Count, from)
+	log.Println("CLIENT RECEIVED MESSAGE IS:", msg.Data, msg.Count, customConn.GetConnectionKey())
 }
-func (p *ProtoEcho) HandleMessage2(from string, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
-	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", from)
+func (p *ProtoEcho) HandleMessage2(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", customConn.GetConnectionKey())
 	msg := DeserializeDataRandomMSG(data)
 	println("RECEIVED RANDOM MESSAGE IS:", msg.Data, msg.Count)
 	fmt.Println("RANDOM NUMBER IS :", msg.Count)

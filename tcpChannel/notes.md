@@ -7,3 +7,8 @@
 ## a server struct will have the following fields:
     * incomming message handler: this will process all the messages received
     * errorHandlerFunction: this will process all the received messages
+
+## TODOs
+* Remove a protocol after they have been registered
+* Add a protocol after all the others have started
+* Should ** CustomConnection ** have an instance of the TCPCHannel ??

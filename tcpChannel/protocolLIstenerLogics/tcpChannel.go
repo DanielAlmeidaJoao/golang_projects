@@ -16,8 +16,8 @@ import (
 const HeaderSize = 11
 
 type ChannelInterface interface {
-	SendAppData(ipAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte) (int, error)
-	SendAppData2(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error)
+	SendAppData(addressKey string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte) (int, error)
+	SendAppData2(addressKey string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error)
 
 	CloseConnection(ipAddress string)
 	OpenConnection(address string, port int, protoSource gobabelUtils.APP_PROTO_ID)
@@ -39,6 +39,21 @@ type CustomConnection struct {
 	conn             net.Conn
 	remoteListenAddr net.Addr
 	connectionKey    string
+}
+
+func (c *CustomConnection) SendData2(source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
+	customWriter := NewCustomWriter3(binary.LittleEndian)
+	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
+	writeHeaders(customWriter, source, destProto, gobabelUtils.APP_MSG, msgHandlerId)
+	msg.SerializeData(customWriter)
+	return auxWriteToNetworkChild(c, customWriter)
+}
+func (c *CustomConnection) SendData(source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
+	customWriter := NewCustomWriter(HeaderSize+len(msg), binary.LittleEndian)
+	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
+	writeHeaders(customWriter, source, destProto, gobabelUtils.APP_MSG, msgHandlerId)
+	_, _ = customWriter.Write(msg)
+	return auxWriteToNetworkChild(c, customWriter)
 }
 
 func (c *CustomConnection) RemoteAddress() net.Addr {
@@ -260,22 +275,22 @@ func (c *TCPChannel) IsConnected(address string) bool {
 	return c.connections[address] != nil
 }
 
+func auxWriteToNetworkChild(connection *CustomConnection, writer *CustomWriter) (int, error) {
+	dataSize := uint32(writer.Len() - HeaderSize)
+	aux := writer.OffSet()
+	writer.SetOffSet(HeaderSize - 4)
+	_, _ = writer.WriteUInt32(dataSize)
+	writer.SetOffSet(aux)
+	//println("SENT DATA IS ", base32.HexEncoding.EncodeToString(writer.Data()))
+	return connection.conn.Write(writer.Data())
+}
+
 func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
 	customCon := c.connections[address]
 	written := -1
 	var err error
 	if customCon != nil {
-		dataSize := uint32(writer.Len() - HeaderSize)
-		aux := writer.OffSet()
-		writer.SetOffSet(HeaderSize - 4)
-		_, _ = writer.WriteUInt32(dataSize)
-		writer.SetOffSet(aux)
-		//println("SENT DATA IS ", base32.HexEncoding.EncodeToString(writer.Data()))
-		written, err = customCon.conn.Write(writer.Data())
-		if connectionDown(&err) {
-			c.handleConnectionDown(customCon, &err)
-		}
-		return written, err
+		return auxWriteToNetworkChild(customCon, writer)
 		//written to logger service
 	} else {
 		err = errors.New(fmt.Sprintf("%s IS NOT CONNECTED", address))
@@ -289,7 +304,7 @@ func (c *TCPChannel) sendMessage(hostAddress string, source, destProto gobabelUt
 	//I DONT LIKE IT:
 	// using protoBuf to binary a struct with the data, msgType, ??
 	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
-	customWriter := NewCustomWriter3(binary.LittleEndian)
+	customWriter := NewCustomWriter(HeaderSize+len(msg), binary.LittleEndian)
 	writeHeaders(customWriter, source, destProto, msgType, msgHandlerId)
 	customWriter.Write(msg)
 	return c.auxWriteToNetwork(hostAddress, customWriter)
