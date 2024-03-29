@@ -63,7 +63,7 @@ func sameMsgs(m1, m2 *EchoMessage) bool {
 func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
 	m := p.MessagesSent[int(msg.Count)]
-	log.Println("CLIENT RECEIVED THE SAME MESSAGE ? ", sameMsgs(m, msg))
+	log.Println("CLIENT RECEIVED THE SAME MESSAGE ? ", sameMsgs(m, msg), m.Count)
 }
 func (p *ProtoEcho) HandleMessage2(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", customConn.GetConnectionKey())
@@ -96,6 +96,7 @@ func test() {
 func (p *ProtoEcho) SendMessage(address string, data string) (int, error) {
 	return p.ChannelInterface.SendAppData(address, p.ProtocolUniqueId(), p.ProtocolUniqueId(), []byte(data))
 }
+
 func NewEchoProto(manager protoListener.ProtoListenerInterface) *ProtoEcho {
 	return &ProtoEcho{
 		id:           gobabelUtils.APP_PROTO_ID(45),

@@ -23,6 +23,7 @@ type ChannelInterface interface {
 	CloseConnections()
 	OpenConnection(address string, port int, protoSource gobabelUtils.APP_PROTO_ID)
 	IsConnected(address string) bool
+	Connections() []*CustomConnection
 }
 
 func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE) *TCPChannel {
@@ -210,7 +211,15 @@ func writeHeaders(buf *CustomWriter, source, destProto gobabelUtils.APP_PROTO_ID
 }
 
 //write order: msgType(uint8), sourceProto(uint16), destProto(uint16),dataLength(uint32),appData
-
+func (t *TCPChannel) Connections() []*CustomConnection {
+	cons := make([]*CustomConnection, len(t.connections))
+	count := 0
+	for _, v := range t.connections {
+		cons[count] = v
+		count++
+	}
+	return cons
+}
 func (c *TCPChannel) readFromConnection(customCon *CustomConnection, listenAddress net.Addr) {
 	conn := customCon.conn
 	for {

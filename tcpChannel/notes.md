@@ -13,3 +13,4 @@
 * Add a protocol after all the others have started
 * Should ** CustomConnection ** have an instance of the TCPCHannel ??
 * Find a way to gobabel block the main thread
+* MSGCODE not being used on the receiver ; only send the client serverAddress if peerTopeer

@@ -40,8 +40,11 @@ func PeriodicTimerHandler(proto gobabelUtils.APP_PROTO_ID, message interface{}) 
 			Count: int32(protocol.Counter),
 		}
 		protocol.MessagesSent[protocol.Counter] = &msg
-		result, er := protocol.ServerAddr.SendData2(45, 45, &msg, 2)
-		log.Println("MSG SENT AFTER TIMER: ", result, er)
+		for _, value := range protocol.ChannelInterface.Connections() {
+			result, er := value.SendData2(45, 45, &msg, 2)
+			log.Println("MSG SENT AFTER TIMER: ", result, er)
+		}
+
 	} else {
 		log.Fatal("FAILED TO CAST OBJECT")
 	}
@@ -82,7 +85,7 @@ func main() {
 	//fmt.Println("RESULT IS: ", result, er)
 
 	//protocolsManager.RegisterTimeout(proto.ProtocolUniqueId(), time.Second*5, &msg, TimerFunc1)
-	//protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
+	protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Millisecond*200, proto, PeriodicTimerHandler)
 
 	protocolsManager.WaitForProtocolsToEnd(false)
 }
