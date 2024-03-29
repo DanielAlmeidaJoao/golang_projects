@@ -16,13 +16,16 @@ type ConnectionState struct {
 	err     error
 }
 type ProtoListenerInterface interface {
-	AddProtocol(protocol ProtoInterface) error
-	Start() error
+	//AddProtocol(protocol ProtoInterface) error
+	StartProtocol(protoWrapper ProtoInterface) error
+	WaitForProtocolsToEnd(closeConnections bool)
+	//StartProtocols() error
 	RegisterNetworkMessageHandler(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE) error
 	RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
 	RegisterLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}, funcToExecute gobabelUtils.LocalProtoComHandlerFunc) error
 	CancelTimer(timerId int) bool
 	RegisterPeriodicTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int
+	RemoveProtocol(id gobabelUtils.APP_PROTO_ID)
 }
 type protoWrapper struct {
 	queue                   chan *NetworkEvent
@@ -44,6 +47,7 @@ type timerArgs struct {
 type ProtoListener struct {
 	mutex           sync.Mutex
 	protocols       map[gobabelUtils.APP_PROTO_ID]*protoWrapper
+	waitChannel     chan gobabelUtils.APP_PROTO_ID
 	channel         ChannelInterface
 	messageHandlers map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE
 	timerHandlers   map[int]*timerArgs
@@ -73,6 +77,7 @@ func NewProtocolListener(address string, port int, connectionType gobabelUtils.C
 	protoL := &ProtoListener{
 		protocols:       make(map[gobabelUtils.APP_PROTO_ID]*protoWrapper),
 		timerHandlers:   make(map[int]*timerArgs),
+		waitChannel:     make(chan gobabelUtils.APP_PROTO_ID),
 		channel:         ch,
 		order:           order,
 		messageHandlers: make(map[gobabelUtils.MessageHandlerID]MESSAGE_HANDLER_TYPE),
@@ -81,7 +86,19 @@ func NewProtocolListener(address string, port int, connectionType gobabelUtils.C
 	ch.SetProtoLister(protoL)
 	return protoL
 }
-
+func (l *ProtoListener) WaitForProtocolsToEnd(closeConnections bool) {
+	var protoID gobabelUtils.APP_PROTO_ID
+	for {
+		protoID = <-l.waitChannel
+		delete(l.protocols, protoID)
+		if len(l.protocols) == 0 {
+			if closeConnections {
+				l.channel.CloseConnections()
+			}
+			return
+		}
+	}
+}
 func (l *ProtoListener) RegisterTimeout(sourceProto gobabelUtils.APP_PROTO_ID, duration time.Duration, data interface{}, funcToExecute gobabelUtils.TimerHandlerFunc) int {
 	aux := l.timersId
 	t := time.AfterFunc(duration, func() {
@@ -151,23 +168,49 @@ func (l *ProtoListener) AddProtocol(protocol ProtoInterface) error {
 	}
 	return nil
 }
+func (l *ProtoListener) RemoveProtocol(id gobabelUtils.APP_PROTO_ID) {
+	proto := l.protocols[id]
+	if proto != nil {
+		//TODO USE LOCKS HERE
+		delete(l.protocols, id)
+		close(proto.queue)
+		close(proto.timeoutChannel)
+		close(proto.localCommunicationQueue)
+		l.waitChannel <- id
+	}
+}
 
 // TODO should all protocols receive connection up event ??
 // TODO should a protocol be registered after all the protocols have already started
-func (l *ProtoListener) Start() error {
+func (l *ProtoListener) StartProtocols() error {
 	if len(l.protocols) == 0 {
 		log.Fatal(gobabelUtils.NO_PROTOCOLS_TO_RUN)
 		return gobabelUtils.NO_PROTOCOLS_TO_RUN
 	}
 	for _, protoWrapper := range l.protocols {
-		protoWrapper := protoWrapper
-		go func() {
-			proto := protoWrapper.proto
-			proto.OnStart(l.channel)
-			log.Printf("PROTOCOL <%d> STARTED LISTENING TO EVENTS...\n", proto.ProtocolUniqueId())
-			for {
-				select {
-				case networkEvent := <-protoWrapper.queue:
+		l.auxRunProtocol(protoWrapper)
+	}
+
+	return nil
+
+}
+func (l *ProtoListener) StartProtocol(protoWrapper ProtoInterface) error {
+	err := l.AddProtocol(protoWrapper)
+	if err == nil {
+		l.auxRunProtocol(l.protocols[protoWrapper.ProtocolUniqueId()])
+	}
+	return err
+}
+
+func (l *ProtoListener) auxRunProtocol(protoWrapper *protoWrapper) {
+	go func() {
+		proto := protoWrapper.proto
+		proto.OnStart(l.channel)
+		log.Printf("PROTOCOL <%d> STARTED LISTENING TO EVENTS...\n", proto.ProtocolUniqueId())
+		for {
+			select {
+			case networkEvent, ok := <-protoWrapper.queue:
+				if ok {
 					log.Printf("PROTOCOL <%d> RECEIVED AN EVENT. EVENT TYPE <%d>\n", proto.ProtocolUniqueId(), networkEvent.NET_EVENT)
 					switch networkEvent.NET_EVENT {
 					case gobabelUtils.CONNECTION_UP:
@@ -185,7 +228,11 @@ func (l *ProtoListener) Start() error {
 						(l.channel).CloseConnection(networkEvent.customConn.connectionKey)
 						log.Fatal(fmt.Sprintf("RECEIVED AN EVENT NOT PART OF THE PROTOCOL. CONNECTION CLOSED %s", networkEvent.customConn.remoteListenAddr.String()))
 					}
-				case timerId := <-protoWrapper.timeoutChannel:
+				} else {
+					return
+				}
+			case timerId, ok := <-protoWrapper.timeoutChannel:
+				if ok {
 					args := l.timerHandlers[timerId]
 					if args != nil {
 						if args.timer != nil {
@@ -194,16 +241,18 @@ func (l *ProtoListener) Start() error {
 						}
 						args.funcHandler(args.protoId, args.data)
 					}
-				case localEventCom := <-protoWrapper.localCommunicationQueue:
+				} else {
+					return
+				}
+			case localEventCom, ok := <-protoWrapper.localCommunicationQueue:
+				if ok {
 					localEventCom.ExecuteFunc()
+				} else {
+					return
 				}
 			}
-		}()
-
-	}
-
-	return nil
-
+		}
+	}()
 }
 
 /*********************** CLIENT METHODS ***************************/
@@ -218,7 +267,7 @@ func (l *ProtoListener) DeliverEvent(event *NetworkEvent) {
 	} else {
 		protocol := l.protocols[event.SourceProto]
 		if protocol == nil {
-			log.Fatalln("RECEIVED EVENT FOR A NON EXISTENT PROTOCOL!")
+			log.Println("RECEIVED EVENT FOR A NON EXISTENT PROTOCOL!")
 		} else {
 			log.Default().Println("GOING TO DELIVER AN EVENT TO THE PROTOCOL:", event.SourceProto)
 			protocol.queue <- event

@@ -30,9 +30,9 @@ func main() {
 	proto2 := testUtils.NewEchoProto2(pp)
 
 	fmt.Println("SERVER STARTED2")
-	err := pp.AddProtocol(proto)
+	err := pp.StartProtocol(proto)
 	fmt.Println(err)
-	err = pp.AddProtocol(proto2)
+	err = pp.StartProtocol(proto2)
 	fmt.Println(err)
 
 	fmt.Println("SERVER STARTED3")
@@ -44,7 +44,7 @@ func main() {
 	//fmt.Println(err2)
 	fmt.Println("ERROR REGISTERING MSG HANDLERS:", err1, err2)
 	fmt.Println("SERVER STARTED4")
-	pp.Start()
+	//pp.StartProtocols()
 	fmt.Println("SERVER STARTED5")
 
 	<-cc

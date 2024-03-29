@@ -50,18 +50,17 @@ func main() {
 	// go build ./...
 	fmt.Println("SERVER STARTED")
 
-	cc := make(chan int)
-
 	protocolsManager := protoListener.NewProtocolListener("localhost", 3002, gobabelUtils.SERVER, binary.LittleEndian)
 	proto := testUtils.NewEchoProto(protocolsManager)
-	protocolsManager.AddProtocol(proto)
+	//protocolsManager.AddProtocol(proto)
 	//err1 := protocolsManager.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
 	err2 := protocolsManager.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.ClientHandleMessage) //registar no server
 	if err2 != nil {
 		log.Println("ERROR REGISTERING MSG HANDLERS:", err2)
 	}
 
-	err := protocolsManager.Start()
+	//err := protocolsManager.StartProtocols()
+	err := protocolsManager.StartProtocol(proto)
 	if err != nil {
 		log.Fatal(err)
 		panic(1)
@@ -84,5 +83,5 @@ func main() {
 	//protocolsManager.RegisterTimeout(proto.ProtocolUniqueId(), time.Second*5, &msg, TimerFunc1)
 	protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
 
-	<-cc
+	protocolsManager.WaitForProtocolsToEnd(false)
 }
