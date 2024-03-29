@@ -31,8 +31,8 @@ func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECT
 		address:        address,
 		port:           port,
 		connectionType: connectionType,
+		started:        false,
 	}
-	channel.start()
 	return channel
 }
 
@@ -40,6 +40,7 @@ type CustomConnection struct {
 	conn             net.Conn
 	remoteListenAddr net.Addr
 	connectionKey    string
+	isServer         bool
 }
 
 func (c *CustomConnection) SendData2(source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
@@ -83,6 +84,7 @@ type TCPChannel struct {
 	listener       net.Listener
 	protoListener  ProtoListener
 	connectionType gobabelUtils.CONNECTION_TYPE
+	started        bool
 }
 
 func shutDown(c *TCPChannel) {
@@ -94,7 +96,11 @@ func (c *TCPChannel) SetProtoLister(p *ProtoListener) {
 func (c *TCPChannel) formatAddress() string {
 	return fmt.Sprintf("%s:%d", c.address, c.port)
 }
-func (c *TCPChannel) start() {
+func (c *TCPChannel) Start() {
+	if c.started {
+		return
+	}
+	c.started = true
 	listener, err := net.Listen("tcp", c.formatAddress())
 	gobabelUtils.Abort(err)
 	c.listener = listener
@@ -105,7 +111,7 @@ func (c *TCPChannel) start() {
 			customCon := &CustomConnection{
 				conn: conn,
 			}
-			c.readFromConnection(customCon, nil)
+			go c.readFromConnection(customCon, nil)
 			//c.onConnected(conn, fmt.Sprintf("%s:%d", c.address, c.port), gobabelUtils.ALL_PROTO_ID, true)
 		}
 	}()
@@ -120,20 +126,27 @@ func (c *TCPChannel) onDisconnected(from string) {
 	delete(c.connections, from)
 	c.mutex.Unlock()
 }
-func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, listenAddress net.Addr) *CustomConnection {
+func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, listenAddress net.Addr, isServer bool) *CustomConnection {
 	if customCon == nil {
 		customCon = &CustomConnection{
 			conn: conn,
 		}
 	}
+	customCon.isServer = isServer //this entity is a server
+	c.mutex.Lock()
 
 	var addressKey string
+	log.Println("LISTEN ADDRESS KEY AND REMOTE:", listenAddress.String(), conn.RemoteAddr().String(), conn.LocalAddr().String())
 	if c.connections[listenAddress.String()] == nil {
 		addressKey = listenAddress.String()
-	} else {
+	} else if isServer {
 		addressKey = conn.RemoteAddr().String()
+	} else {
+		log.Println(c.connections[listenAddress.String()].conn == conn)
+		addressKey = conn.LocalAddr().String()
 	}
-	c.mutex.Lock()
+	log.Println("ADDRESS KEY:", addressKey)
+
 	c.connections[addressKey] = customCon
 	c.mutex.Unlock()
 	customCon.connectionKey = addressKey
@@ -143,7 +156,7 @@ func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, liste
 func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest gobabelUtils.APP_PROTO_ID) {
 	//send the local listen address to the remote server
 	var customCon *CustomConnection
-	customCon = c.auxAddCon(nil, conn, conn.RemoteAddr())
+	customCon = c.auxAddCon(nil, conn, conn.RemoteAddr(), false)
 	_, err := c.sendMessage(customCon.connectionKey, gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, []byte(listenAddress), gobabelUtils.LISTEN_ADDRESS_MSG, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
 	if err != nil {
 		c.handleConnectionDown(customCon, &err)
@@ -252,7 +265,7 @@ func (c *TCPChannel) readFromConnection(customCon *CustomConnection, listenAddre
 			tcpAddr, err := net.ResolveTCPAddr("tcp", string(buffer))
 			if err == nil {
 				log.Println("THE CLIENT REMOTE ADDRESS IS: ", tcpAddr.String())
-				c.auxAddCon(customCon, conn, tcpAddr)
+				c.auxAddCon(customCon, conn, tcpAddr, true)
 				listenAddress = tcpAddr
 				netEvent = gobabelUtils.CONNECTION_UP
 			} else {

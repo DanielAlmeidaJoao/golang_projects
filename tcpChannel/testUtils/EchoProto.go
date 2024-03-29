@@ -39,11 +39,11 @@ func (p *ProtoEcho) OnMessageArrival(customCon *protoListener.CustomConnection, 
 	fmt.Println("------------ RECEIVED MESSAGE FROM: -----------------", customCon.GetConnectionKey(), str)
 }
 func (p *ProtoEcho) ConnectionUp(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
-	fmt.Printf("CONNECTION IS UP. FROM <%s>\n", customCon.GetConnectionKey())
+	log.Printf("CONNECTION IS UP. FROM <%s>\n", customCon.GetConnectionKey())
 	p.ServerAddr = customCon
 }
 func (p *ProtoEcho) ConnectionDown(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
-	fmt.Printf("CONNECTION IS DOW. FROM <%s>\n", customCon.GetConnectionKey())
+	log.Printf("CONNECTION IS DOW. TO/FROM <%s>\n", customCon.GetConnectionKey())
 }
 func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)

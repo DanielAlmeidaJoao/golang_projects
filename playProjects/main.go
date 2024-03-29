@@ -83,6 +83,10 @@ func testMapLen() {
 	ma[12] = "OLA2"
 	ma[13] = "PPOLA"
 	fmt.Println(ma)
+	fmt.Println(len(ma))
+	delete(ma, 12)
+	fmt.Println(len(ma))
+
 }
 
 type EventHolder[T any] struct {
@@ -221,7 +225,7 @@ func main() {
 	//testDefer()
 	//testBytesConversion()
 	//testAppendConversion()
-	//testMapLen()
+	testMapLen()
 	//testGenerics()
 	//testIntConversion()
 	//testSlices()
@@ -229,5 +233,5 @@ func main() {
 	//testAfterFuncTime()
 	//testLogTrace()
 	//testList()
-	testAddressesDifs()
+	//testAddressesDifs()
 }

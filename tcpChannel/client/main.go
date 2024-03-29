@@ -68,6 +68,7 @@ func main() {
 
 	time.Sleep(time.Second * 3)
 	proto.ChannelInterface.OpenConnection("localhost", 3000, 45)
+	proto.ChannelInterface.OpenConnection("localhost", 3000, 45)
 	time.Sleep(time.Second * 5)
 
 	_ = testUtils.EchoMessage{
@@ -81,7 +82,7 @@ func main() {
 	//fmt.Println("RESULT IS: ", result, er)
 
 	//protocolsManager.RegisterTimeout(proto.ProtocolUniqueId(), time.Second*5, &msg, TimerFunc1)
-	protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
+	//protocolsManager.RegisterPeriodicTimeout(proto.ProtocolUniqueId(), time.Second*5, proto, PeriodicTimerHandler)
 
 	protocolsManager.WaitForProtocolsToEnd(false)
 }

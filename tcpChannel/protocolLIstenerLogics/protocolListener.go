@@ -196,6 +196,11 @@ func (l *ProtoListener) StartProtocols() error {
 }
 func (l *ProtoListener) StartProtocol(protoWrapper ProtoInterface) error {
 	err := l.AddProtocol(protoWrapper)
+	if len(l.protocols) == 1 {
+		if ch, ok := l.channel.(*TCPChannel); ok {
+			ch.Start()
+		}
+	}
 	if err == nil {
 		l.auxRunProtocol(l.protocols[protoWrapper.ProtocolUniqueId()])
 	}
