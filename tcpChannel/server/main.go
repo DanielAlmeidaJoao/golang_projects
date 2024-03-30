@@ -3,9 +3,9 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	gobabelUtils "gobabel/commons"
-	protoListener "gobabel/protocolLIstenerLogics"
-	testUtils "gobabel/testUtils"
+	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
+	protoListener "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/protocolLIstenerLogics"
+	testUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/testUtils"
 )
 
 /**

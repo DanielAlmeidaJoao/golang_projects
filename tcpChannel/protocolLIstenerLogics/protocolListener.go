@@ -3,7 +3,7 @@ package protocolLIstenerLogics
 import (
 	"encoding/binary"
 	"fmt"
-	gobabelUtils "gobabel/commons"
+	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 	"log"
 	"net"
 	"sync"

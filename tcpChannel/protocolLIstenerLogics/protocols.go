@@ -1,7 +1,7 @@
 package protocolLIstenerLogics
 
 import (
-	gobabelUtils "gobabel/commons"
+	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 )
 
 type ProtoInterface interface {

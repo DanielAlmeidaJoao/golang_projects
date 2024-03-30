@@ -2,8 +2,8 @@ package testUtils
 
 import (
 	"fmt"
-	gobabelUtils "gobabel/commons"
-	protoListener "gobabel/protocolLIstenerLogics"
+	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
+	protoListener "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/protocolLIstenerLogics"
 	"log"
 )
 
