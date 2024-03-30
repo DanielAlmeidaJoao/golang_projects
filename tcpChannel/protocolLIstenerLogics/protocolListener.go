@@ -197,7 +197,7 @@ func (l *ProtoListener) StartProtocols() error {
 func (l *ProtoListener) StartProtocol(protoWrapper ProtoInterface) error {
 	err := l.AddProtocol(protoWrapper)
 	if len(l.protocols) == 1 {
-		if ch, ok := l.channel.(*TCPChannel); ok {
+		if ch, ok := l.channel.(*tcpChannel); ok {
 			ch.Start()
 		}
 	}

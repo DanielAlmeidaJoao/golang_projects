@@ -19,15 +19,15 @@ type ChannelInterface interface {
 	SendAppData(addressKey string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte) (int, error)
 	SendAppData2(addressKey string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error)
 
-	CloseConnection(ipAddress string)
+	CloseConnection(addressKey string)
 	CloseConnections()
 	OpenConnection(address string, port int, protoSource gobabelUtils.APP_PROTO_ID)
-	IsConnected(address string) bool
+	IsConnected(address string) *CustomConnection
 	Connections() []*CustomConnection
 }
 
-func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE) *TCPChannel {
-	channel := &TCPChannel{
+func NewTCPChannel(address string, port int, connectionType gobabelUtils.CONNECTION_TYPE) *tcpChannel {
+	channel := &tcpChannel{
 		connections:    make(map[string]*CustomConnection),
 		address:        address,
 		port:           port,
@@ -52,7 +52,7 @@ func (c *CustomConnection) SendData2(source, destProto gobabelUtils.APP_PROTO_ID
 	return auxWriteToNetworkChild(c, customWriter)
 }
 
-func (c *TCPChannel) CloseConnections() {
+func (c *tcpChannel) CloseConnections() {
 	for _, v := range c.connections {
 		v.conn.Close()
 	}
@@ -77,7 +77,7 @@ func (c *CustomConnection) Close() error {
 	return c.conn.Close()
 }
 
-type TCPChannel struct {
+type tcpChannel struct {
 	mutex          sync.Mutex
 	connections    map[string]*CustomConnection //map[string]net.Conn  // connectionId, int_ip
 	address        string
@@ -88,16 +88,16 @@ type TCPChannel struct {
 	started        bool
 }
 
-func shutDown(c *TCPChannel) {
+func shutDown(c *tcpChannel) {
 	c.listener.Close()
 }
-func (c *TCPChannel) SetProtoLister(p *ProtoListener) {
+func (c *tcpChannel) SetProtoLister(p *ProtoListener) {
 	c.protoListener = *p
 }
-func (c *TCPChannel) formatAddress() string {
+func (c *tcpChannel) formatAddress() string {
 	return fmt.Sprintf("%s:%d", c.address, c.port)
 }
-func (c *TCPChannel) Start() {
+func (c *tcpChannel) Start() {
 	if c.started {
 		return
 	}
@@ -118,16 +118,16 @@ func (c *TCPChannel) Start() {
 	}()
 }
 
-func (c *TCPChannel) toByteMSG(msgType gobabelUtils.MSG_TYPE, data []byte) {
+func (c *tcpChannel) toByteMSG(msgType gobabelUtils.MSG_TYPE, data []byte) {
 	//TODO sum := make([]byte, 1+len(data))
 	//append(sum, msgType...)
 }
-func (c *TCPChannel) onDisconnected(from string) {
+func (c *tcpChannel) onDisconnected(from string) {
 	c.mutex.Lock()
 	delete(c.connections, from)
 	c.mutex.Unlock()
 }
-func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, listenAddress net.Addr, isServer bool) *CustomConnection {
+func (c *tcpChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, listenAddress net.Addr, isServer bool) *CustomConnection {
 	if customCon == nil {
 		customCon = &CustomConnection{
 			conn: conn,
@@ -154,7 +154,7 @@ func (c *TCPChannel) auxAddCon(customCon *CustomConnection, conn net.Conn, liste
 	customCon.remoteListenAddr = listenAddress
 	return customCon
 }
-func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest gobabelUtils.APP_PROTO_ID) {
+func (c *tcpChannel) onConnected(conn net.Conn, listenAddress string, protoDest gobabelUtils.APP_PROTO_ID) {
 	//send the local listen address to the remote server
 	var customCon *CustomConnection
 	customCon = c.auxAddCon(nil, conn, conn.RemoteAddr(), false)
@@ -175,7 +175,7 @@ func (c *TCPChannel) onConnected(conn net.Conn, listenAddress string, protoDest 
 	}
 }
 
-func (c *TCPChannel) CloseConnection(connectionId string) {
+func (c *tcpChannel) CloseConnection(connectionId string) {
 	conn := c.connections[connectionId]
 	go func() {
 		if conn != nil {
@@ -186,10 +186,10 @@ func (c *TCPChannel) CloseConnection(connectionId string) {
 		}
 	}()
 }
-func (c *TCPChannel) closeConnection2(conn net.Conn) {
+func (c *tcpChannel) closeConnection2(conn net.Conn) {
 	c.CloseConnection(conn.RemoteAddr().String())
 }
-func (c *TCPChannel) OpenConnection(address string, port int, protoSource gobabelUtils.APP_PROTO_ID) {
+func (c *tcpChannel) OpenConnection(address string, port int, protoSource gobabelUtils.APP_PROTO_ID) {
 	go func() {
 		conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", address, port))
 		if err != nil {
@@ -211,7 +211,7 @@ func writeHeaders(buf *CustomWriter, source, destProto gobabelUtils.APP_PROTO_ID
 }
 
 //write order: msgType(uint8), sourceProto(uint16), destProto(uint16),dataLength(uint32),appData
-func (t *TCPChannel) Connections() []*CustomConnection {
+func (t *tcpChannel) Connections() []*CustomConnection {
 	cons := make([]*CustomConnection, len(t.connections))
 	count := 0
 	for _, v := range t.connections {
@@ -220,7 +220,7 @@ func (t *TCPChannel) Connections() []*CustomConnection {
 	}
 	return cons
 }
-func (c *TCPChannel) readFromConnection(customCon *CustomConnection, listenAddress net.Addr) {
+func (c *tcpChannel) readFromConnection(customCon *CustomConnection, listenAddress net.Addr) {
 	conn := customCon.conn
 	for {
 		var err error
@@ -289,10 +289,10 @@ func (c *TCPChannel) readFromConnection(customCon *CustomConnection, listenAddre
 	}
 }
 
-func (c *TCPChannel) SendAppData(ipAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte) (int, error) {
+func (c *tcpChannel) SendAppData(ipAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte) (int, error) {
 	return c.sendMessage(ipAddress, source, destProto, msg, gobabelUtils.APP_MSG, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
 }
-func (c *TCPChannel) SendAppData2(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
+func (c *tcpChannel) SendAppData2(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg NetworkMessage, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
 	customWriter := NewCustomWriter3(binary.LittleEndian)
 	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
 	writeHeaders(customWriter, source, destProto, gobabelUtils.APP_MSG, msgHandlerId)
@@ -300,8 +300,8 @@ func (c *TCPChannel) SendAppData2(hostAddress string, source, destProto gobabelU
 	return c.auxWriteToNetwork(hostAddress, customWriter)
 }
 
-func (c *TCPChannel) IsConnected(address string) bool {
-	return c.connections[address] != nil
+func (c *tcpChannel) IsConnected(address string) *CustomConnection {
+	return c.connections[address]
 }
 
 func auxWriteToNetworkChild(connection *CustomConnection, writer *CustomWriter) (int, error) {
@@ -314,7 +314,7 @@ func auxWriteToNetworkChild(connection *CustomConnection, writer *CustomWriter) 
 	return connection.conn.Write(writer.Data())
 }
 
-func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
+func (c *tcpChannel) auxWriteToNetwork(address string, writer *CustomWriter) (int, error) {
 	customCon := c.connections[address]
 	written := -1
 	var err error
@@ -329,7 +329,7 @@ func (c *TCPChannel) auxWriteToNetwork(address string, writer *CustomWriter) (in
 
 // TODO use a golang routine just to send messages
 // write order: msgType(uint8), sourceProto(uint16), destProto(uint16),dataLength(uint32),appData
-func (c *TCPChannel) sendMessage(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
+func (c *tcpChannel) sendMessage(hostAddress string, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, msgType gobabelUtils.MSG_TYPE, msgHandlerId gobabelUtils.MessageHandlerID) (int, error) {
 	//I DONT LIKE IT:
 	// using protoBuf to binary a struct with the data, msgType, ??
 	//TODO ASSERT THAT THE BUFFER IS THE SAME AFTER BEING PASSED TO HEADER AND THEN TO THE SERIALIZEER
@@ -338,7 +338,7 @@ func (c *TCPChannel) sendMessage(hostAddress string, source, destProto gobabelUt
 	customWriter.Write(msg)
 	return c.auxWriteToNetwork(hostAddress, customWriter)
 }
-func (t *TCPChannel) handleConnectionDown(customCon *CustomConnection, err *error) {
+func (t *tcpChannel) handleConnectionDown(customCon *CustomConnection, err *error) {
 	//_ = customCon.conn.Close()
 	t.onDisconnected(customCon.connectionKey)
 	msgEvent := NewNetworkEvent(customCon, nil, gobabelUtils.ALL_PROTO_ID, gobabelUtils.ALL_PROTO_ID, gobabelUtils.CONNECTION_DOWN, gobabelUtils.NO_NETWORK_MESSAGE_HANDLER_ID)
