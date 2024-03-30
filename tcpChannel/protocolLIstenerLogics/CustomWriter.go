@@ -2,7 +2,6 @@ package protocolLIstenerLogics
 
 import (
 	"encoding/binary"
-	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 )
 
 type NetworkMessage interface {
@@ -10,7 +9,7 @@ type NetworkMessage interface {
 }
 
 // type MESSAGE_HANDLER_TYPE func(from string, protoSource APP_PROTO_ID, data []byte)
-type MESSAGE_HANDLER_TYPE func(customConn *CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *CustomReader)
+type MESSAGE_HANDLER_TYPE func(customConn *CustomConnection, protoSource APP_PROTO_ID, data *CustomReader)
 
 type CustomWriter struct {
 	data   []byte

@@ -2,13 +2,12 @@ package testUtils
 
 import (
 	"fmt"
-	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 	protoListener "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/protocolLIstenerLogics"
 	"log"
 )
 
 type ProtoEcho struct {
-	id               gobabelUtils.APP_PROTO_ID
+	id               protoListener.APP_PROTO_ID
 	ChannelInterface protoListener.ChannelInterface
 	ServerAddr       *protoListener.CustomConnection
 	Counter          int
@@ -26,7 +25,7 @@ type ProtoEcho struct {
 
 */
 
-func (p *ProtoEcho) ProtocolUniqueId() gobabelUtils.APP_PROTO_ID {
+func (p *ProtoEcho) ProtocolUniqueId() protoListener.APP_PROTO_ID {
 	return p.id
 }
 
@@ -34,7 +33,7 @@ func (p *ProtoEcho) OnStart(channelInterface protoListener.ChannelInterface) {
 	p.ChannelInterface = channelInterface
 	log.Println("PROTOCOL STARTED: ", p.ProtocolUniqueId())
 }
-func (p *ProtoEcho) OnMessageArrival(customCon *protoListener.CustomConnection, source, destProto gobabelUtils.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
+func (p *ProtoEcho) OnMessageArrival(customCon *protoListener.CustomConnection, source, destProto protoListener.APP_PROTO_ID, msg []byte, channelInterface protoListener.ChannelInterface) {
 	str := string(msg)
 	fmt.Println("------------ RECEIVED MESSAGE FROM: -----------------", customCon.GetConnectionKey(), str)
 }
@@ -45,7 +44,7 @@ func (p *ProtoEcho) ConnectionUp(customCon *protoListener.CustomConnection, chan
 func (p *ProtoEcho) ConnectionDown(customCon *protoListener.CustomConnection, channelInterface protoListener.ChannelInterface) {
 	log.Printf("CONNECTION IS DOW. TO/FROM <%s>\n", customCon.GetConnectionKey())
 }
-func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, protoSource protoListener.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
 	log.Println("RECEIVED MESSAGE IS:", msg.Data, msg.Count)
 	pair := &protoListener.CustomPair[string, *EchoMessage]{
@@ -60,23 +59,23 @@ func (p *ProtoEcho) HandleMessage(customConn *protoListener.CustomConnection, pr
 func sameMsgs(m1, m2 *EchoMessage) bool {
 	return m1.Count == m2.Count && m1.Data == m2.Data
 }
-func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource protoListener.APP_PROTO_ID, data *protoListener.CustomReader) {
 	msg := DeserializeData(data)
 	m := p.MessagesSent[int(msg.Count)]
 	log.Println("CLIENT RECEIVED THE SAME MESSAGE ? ", sameMsgs(m, msg), m.Count)
 }
-func (p *ProtoEcho) HandleMessage2(customConn *protoListener.CustomConnection, protoSource gobabelUtils.APP_PROTO_ID, data *protoListener.CustomReader) {
+func (p *ProtoEcho) HandleMessage2(customConn *protoListener.CustomConnection, protoSource protoListener.APP_PROTO_ID, data *protoListener.CustomReader) {
 	fmt.Println("RECEIVED A RANDOM MESSAGE FROM ", customConn.GetConnectionKey())
 	msg := DeserializeDataRandomMSG(data)
 	println("RECEIVED RANDOM MESSAGE IS:", msg.Data, msg.Count)
 	fmt.Println("RANDOM NUMBER IS :", msg.Count)
 }
 
-func (p *ProtoEcho) HandleLocalCommunication(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}) {
+func (p *ProtoEcho) HandleLocalCommunication(sourceProto, destProto protoListener.APP_PROTO_ID, data interface{}) {
 	log.Println(sourceProto, destProto, data)
 }
 
-func (p *ProtoEcho) Proto2GoingToReply(sourceProto, destProto gobabelUtils.APP_PROTO_ID, data interface{}) {
+func (p *ProtoEcho) Proto2GoingToReply(sourceProto, destProto protoListener.APP_PROTO_ID, data interface{}) {
 	log.Println(p.id, "RECEVEID DATA FROM:", sourceProto, destProto, data)
 
 	pair, ok := data.(*protoListener.CustomPair[string, *EchoMessage])
@@ -99,14 +98,14 @@ func (p *ProtoEcho) SendMessage(address string, data string) (int, error) {
 
 func NewEchoProto(manager protoListener.ProtoListenerInterface) *ProtoEcho {
 	return &ProtoEcho{
-		id:           gobabelUtils.APP_PROTO_ID(45),
+		id:           protoListener.APP_PROTO_ID(45),
 		listener:     manager,
 		MessagesSent: make(map[int]*EchoMessage),
 	}
 }
 func NewEchoProto2(manager protoListener.ProtoListenerInterface) *ProtoEcho {
 	return &ProtoEcho{
-		id:           gobabelUtils.APP_PROTO_ID(50),
+		id:           protoListener.APP_PROTO_ID(50),
 		listener:     manager,
 		MessagesSent: make(map[int]*EchoMessage),
 	}

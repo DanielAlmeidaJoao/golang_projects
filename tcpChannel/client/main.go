@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 	protoListener "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/protocolLIstenerLogics"
 	testUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/testUtils"
 	"log"
@@ -21,7 +20,7 @@ type ProtoInterface interface {
 }
 */
 
-func TimerFunc1(proto gobabelUtils.APP_PROTO_ID, message interface{}) {
+func TimerFunc1(proto protoListener.APP_PROTO_ID, message interface{}) {
 	log.Println("TIMER TRIGERED!!!! !!!! !!!!")
 	msg, ok := message.(*testUtils.EchoMessage)
 	if ok {
@@ -30,7 +29,7 @@ func TimerFunc1(proto gobabelUtils.APP_PROTO_ID, message interface{}) {
 		log.Println("DATA IS WRONG TYPE")
 	}
 }
-func PeriodicTimerHandler(proto gobabelUtils.APP_PROTO_ID, message interface{}) {
+func PeriodicTimerHandler(proto protoListener.APP_PROTO_ID, message interface{}) {
 	localTime := time.Now()
 	protocol, ok := message.(*testUtils.ProtoEcho)
 	if ok {
@@ -53,11 +52,11 @@ func main() {
 	// go build ./...
 	fmt.Println("SERVER STARTED")
 
-	protocolsManager := protoListener.NewProtocolListener("localhost", 3002, gobabelUtils.SERVER, binary.LittleEndian)
+	protocolsManager := protoListener.NewProtocolListener("localhost", 3002, protoListener.SERVER, binary.LittleEndian)
 	proto := testUtils.NewEchoProto(protocolsManager)
 	//protocolsManager.AddProtocol(proto)
 	//err1 := protocolsManager.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
-	err2 := protocolsManager.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.ClientHandleMessage) //registar no server
+	err2 := protocolsManager.RegisterNetworkMessageHandler(protoListener.MessageHandlerID(2), proto.ClientHandleMessage) //registar no server
 	if err2 != nil {
 		log.Println("ERROR REGISTERING MSG HANDLERS:", err2)
 	}

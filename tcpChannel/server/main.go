@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
-	gobabelUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/commons"
 	protoListener "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/protocolLIstenerLogics"
 	testUtils "github.com/DanielAlmeidaJoao/golang_projects/tree/main/tcpChannel/gobabel/testUtils"
 )
@@ -24,7 +23,7 @@ type ProtoInterface interface {
 func main() {
 	//go build ./...
 	fmt.Println("SERVER STARTED")
-	pp := protoListener.NewProtocolListener("localhost", 3000, gobabelUtils.SERVER, binary.LittleEndian)
+	pp := protoListener.NewProtocolListener("localhost", 3000, protoListener.SERVER, binary.LittleEndian)
 	proto := testUtils.NewEchoProto(pp)
 	proto2 := testUtils.NewEchoProto2(pp)
 
@@ -39,8 +38,8 @@ func main() {
 	//proto.ChannelInterface.OpenConnection("localhost", 3002, 45)
 	//time.Sleep(time.Second * 5)
 	//(handlerId gobabelUtils.MessageHandlerID, funcHandler MESSAGE_HANDLER_TYPE, deserializer MESSAGE_DESERIALIZER_TYPE)
-	err1 := pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(2), proto.HandleMessage)
-	err2 := pp.RegisterNetworkMessageHandler(gobabelUtils.MessageHandlerID(3), proto.HandleMessage2) //registar no server
+	err1 := pp.RegisterNetworkMessageHandler(protoListener.MessageHandlerID(2), proto.HandleMessage)
+	err2 := pp.RegisterNetworkMessageHandler(protoListener.MessageHandlerID(3), proto.HandleMessage2) //registar no server
 
 	//err2 = pp.RegisterLocalCommunication(proto.ProtocolUniqueId(), proto2.ProtocolUniqueId(), 656, proto2.HandleLocalCommunication) //registar no server
 	//fmt.Println(err2)
