@@ -6,7 +6,7 @@ import (
 	"math"
 )
 
-//the state of the proposer
+// the state of the proposer
 type ProposerProtocol struct {
 	value        *PaxosMsg  //proposed value
 	proposal_num uint32     //proposal number
@@ -50,12 +50,15 @@ func (p *ProposerProtocol) onPropose(customConn *tcpChannel.CustomConnection, pr
 	msg := ReadPaxosMsg(data)
 	p.onProposeClientCall(msg)
 }
-func MaxValue(promises []*Promise) *Promise {
+func (p *ProposerProtocol) MaxValue(promises []*Promise) *Promise {
 	aux := promises[0]
 	for _, v := range promises {
-		if v.accepted_num > aux.accepted_num {
+		if v.accepted_value != nil {
 			aux = v
 		}
+	}
+	if aux.accepted_value == nil {
+		aux.accepted_value = p.value
 	}
 	return aux
 }
@@ -63,16 +66,22 @@ func (p *ProposerProtocol) majority() int {
 	return int(math.Ceil(float64((len(p.peers) + 1) / 2)))
 }
 
-/**
+/*
+*
 This function is called when the proposer receives a promise message from one of the acceptors.
 */
 func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	promise := ReadData(data)
+	log.Println("ACCEPTED PROMISE from ", customConn.RemoteAddress().String(), p.proposal_num, promise.promised_num)
+	if promise.promised_num == 0 {
+		promise.promised_num = p.proposal_num
+		promise.accepted_value = p.value
+	}
 	if promise.promised_num == p.proposal_num {
 		p.promises = append(p.promises, promise)
 		majority := p.majority()
 		if len(p.promises) == majority {
-			aux := p.promises[0]
+			aux := p.MaxValue(p.promises)
 			if p.value.msgId != aux.accepted_value.msgId {
 				p.acks = 0
 			}
@@ -92,9 +101,10 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 }
 
 /*
-   This function is called when the proposer receives an accepted message from one of the acceptors.
+This function is called when the proposer receives an accepted message from one of the acceptors.
 */
 func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	log.Println("ACCEPTED ACCEPTED")
 	accept := ReadDataAcceptMessage(data)
 	p.promises = make([]*Promise, 3)
 	if p.proposal_num == accept.proposal_num {

@@ -20,6 +20,8 @@ func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *A
 }
 func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	preparaMessage := ReadDataPrepareMessage(data)
+	log.Println("ON PREPARE 2 ", a.promised_num, preparaMessage.proposal_num, customConn.RemoteAddress().String())
+
 	if a.promised_num < preparaMessage.proposal_num {
 		a.promised_num = preparaMessage.proposal_num
 		prom := &Promise{
@@ -32,12 +34,17 @@ func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, proto
 }
 
 func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	log.Println("ACCEPTOR RECEIVED ACCEPT MSG")
+
 	accptMessage := ReadDataAcceptMessage(data)
 	if a.promised_num <= accptMessage.proposal_num {
+		log.Println("INTO AACCEPTER ON ACCEPT")
 		a.promised_num = accptMessage.proposal_num
 		a.accepted_num = accptMessage.proposal_num
 		a.accepted_value = accptMessage.value
 		customConn.SendData2(ACCEPTOR_PROTO_ID, PROPOSER_PROTO_ID, accptMessage, ON_ACCEPTED_ID)
+		log.Println("EXITED AACCEPTED ON ACCEPT")
+
 	}
 }
 

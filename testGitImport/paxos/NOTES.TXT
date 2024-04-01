@@ -1,0 +1,2 @@
+CHANGE THE FUNCTION  LocalProtoComHandlerFunc TO ACCPET the dest proto in the parameter,
+when being executed, the dest will be passed to the function

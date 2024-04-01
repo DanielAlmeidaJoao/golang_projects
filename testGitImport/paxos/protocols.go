@@ -5,7 +5,8 @@ import (
 )
 
 const (
-	PROPOSER_PROTO_ID tcpChannel.APP_PROTO_ID = iota
+	PROPOSER_PROTO_default tcpChannel.APP_PROTO_ID = iota
+	PROPOSER_PROTO_ID
 	ACCEPTOR_PROTO_ID
 	LEARNER_PROTO_ID
 	CLIENT_PROTO_ID
@@ -29,6 +30,9 @@ func (receiver *PaxosMsg) SerializeData(writer *tcpChannel.CustomWriter) {
 }
 func (p *PaxosMsg) WritePaxosMsg(writer *tcpChannel.CustomWriter) {
 	//TODO check when the message is NIL
+	if p == nil {
+		p = &PaxosMsg{}
+	}
 	writer.WriteUInt32(uint32(len(p.msgId)))
 	if len(p.msgId) > 0 {
 		writer.WriteString(p.msgId)
@@ -51,6 +55,8 @@ func ReadPaxosMsg(data *tcpChannel.CustomReader) *PaxosMsg {
 		bytes = make([]byte, msgValueLen)
 		data.Read(bytes)
 		msg.msgValue = string(bytes)
+	} else {
+		msg = nil
 	}
 	return msg
 }

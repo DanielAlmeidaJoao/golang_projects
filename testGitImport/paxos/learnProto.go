@@ -10,24 +10,30 @@ import (
 type LearnerProto struct {
 	decided_value *PaxosMsg
 	protoManager  tcpChannel.ProtoListenerInterface
+	clientProto   *ClientProtocol
 }
 
-func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *LearnerProto {
+func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, protocol *ClientProtocol) *LearnerProto {
 	return &LearnerProto{
 		protoManager: listenerInterface,
+		clientProto:  protocol,
 	}
 }
 func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	value := ReadPaxosMsg(data)
+	log.Println("DECISION TAKEN ", value)
+	// func(sourceProto APP_PROTO_ID, destProto APP_PROTO_ID, data interface{})
+	err2 := receiver.protoManager.RegisterLocalCommunication(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, value, receiver.clientProto.ValueDecided) //registar no server
 	receiver.decided_value = value
 	//TODO sendRequestToClient
 }
 
 func (a *LearnerProto) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
-	return PROPOSER_PROTO_ID
+	return LEARNER_PROTO_ID
 }
 func (a *LearnerProto) OnStart(channelInterface tcpChannel.ChannelInterface) {
-	err1 := a.protoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onDecided) //registar no server
+	log.Println("LEARNER STARTED")
+	err1 := a.protoManager.RegisterNetworkMessageHandler(ON_DECIDE_ID, a.onDecided) //registar no server
 	log.Println("REGISTERED ON DECIDED: ", err1)
 }
 func (a *LearnerProto) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
