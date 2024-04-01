@@ -34,26 +34,42 @@ func NewClientProtocol(listenerInterface tcpChannel.ProtoListenerInterface, prop
 func (c *ClientProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return CLIENT_PROTO_ID
 }
-
+func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.ProtoInterface, data interface{}) {
+	p, ok := destProto.(*ProposerProtocol)
+	if ok {
+		paxosMsg, ok := data.(*PaxosMsg)
+		if ok {
+			p.OnProposeClientCall(paxosMsg)
+		}
+	} else {
+		log.Println("ERROR CONVERTING")
+	}
+}
 func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data interface{}) {
 	msg := &PaxosMsg{
 		msgId:    time.Now().String(),
 		msgValue: "daniel joao",
 	}
 	c.proposedValue = msg
-	f := c.proper.SendPaxosRequest
-	err2 := c.protoManager.RegisterLocalCommunication(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, msg, f) //registar no server
+	f := SendPaxosRequest
+	err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, msg, f) //registar no server
 	log.Println("ERROR REGISTERING PROTO", err2)
 }
-func (c *ClientProtocol) ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.APP_PROTO_ID, data interface{}) {
-	value, ok := data.(*PaxosMsg)
-	if ok {
-		if c.proposedValue.msgId != value.msgId {
-			f := c.proper.SendPaxosRequest
-			err2 := c.protoManager.RegisterLocalCommunication(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.proposedValue, f) //registar no server
-			log.Println("ERROR REGISTERING PROTO", err2)
+
+// type LocalProtoComHandlerFunc func(sourceProto APP_PROTO_ID, destProto ProtoInterface, data interface{})
+func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.ProtoInterface, data interface{}) {
+	c, valid := destProto.(*ClientProtocol)
+	if valid {
+		value, ok := data.(*PaxosMsg)
+		if ok {
+			if c.proposedValue.msgId != value.msgId {
+				f := SendPaxosRequest
+				err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.proposedValue, f) //registar no server
+				log.Println("ERROR REGISTERING PROTO", err2)
+			}
 		}
 	}
+
 }
 
 func (c *ClientProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {

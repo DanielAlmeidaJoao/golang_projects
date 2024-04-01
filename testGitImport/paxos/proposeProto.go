@@ -27,7 +27,7 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *P
    The client calls this function of the proposer to propose its desired value.
    This will be called also after abort to try again.
 */
-func (p *ProposerProtocol) onProposeClientCall(clientValue *PaxosMsg) {
+func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	p.proposal_num = p.proposal_num + 1
 	p.promises = make([]*Promise, 3)
 	p.value = clientValue
@@ -40,15 +40,10 @@ func (p *ProposerProtocol) onProposeClientCall(clientValue *PaxosMsg) {
 		v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, prepMessage, ON_PREPARE_ID)
 	}
 }
-func (p *ProposerProtocol) SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.APP_PROTO_ID, data interface{}) {
-	paxosMsg, ok := data.(*PaxosMsg)
-	if ok {
-		p.onProposeClientCall(paxosMsg)
-	}
-}
+
 func (p *ProposerProtocol) onPropose(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	msg := ReadPaxosMsg(data)
-	p.onProposeClientCall(msg)
+	p.OnProposeClientCall(msg)
 }
 func (p *ProposerProtocol) MaxValue(promises []*Promise) *Promise {
 	aux := promises[0]

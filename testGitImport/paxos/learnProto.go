@@ -10,20 +10,18 @@ import (
 type LearnerProto struct {
 	decided_value *PaxosMsg
 	protoManager  tcpChannel.ProtoListenerInterface
-	clientProto   *ClientProtocol
 }
 
-func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, protocol *ClientProtocol) *LearnerProto {
+func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *LearnerProto {
 	return &LearnerProto{
 		protoManager: listenerInterface,
-		clientProto:  protocol,
 	}
 }
 func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	value := ReadPaxosMsg(data)
 	log.Println("DECISION TAKEN ", value)
 	// func(sourceProto APP_PROTO_ID, destProto APP_PROTO_ID, data interface{})
-	err2 := receiver.protoManager.RegisterLocalCommunication(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, value, receiver.clientProto.ValueDecided) //registar no server
+	_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, value, ValueDecided) //registar no server
 	receiver.decided_value = value
 	//TODO sendRequestToClient
 }
