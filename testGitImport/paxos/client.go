@@ -61,7 +61,6 @@ func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data i
 		term:     c.currentTerm,
 	}
 	c.lastProposed = msg
-	c.ops[msg.msgId] = msg
 	msg.proposalNum = c.global_count + 1
 	log.Println("----------------------------------------------------------------------------------------------- timer triggereed")
 	f := SendPaxosRequest
@@ -88,14 +87,15 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			}
 			c.global_count = value.proposalNum
 			aux := c.ops[value.msgId]
-			/**
+
+			log.Println("FUCKKKKK SELF AND GOT ", c.lastProposed.msgValue, value.msgValue, c.currentTerm, value.term)
+
 			if value.msgId != c.lastProposed.msgId {
 				c.lastProposed.term = c.currentTerm
 				c.lastProposed.proposalNum = c.global_count
 				f := SendPaxosRequest
 				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, f) //registar no server
-
-			}**/
+			}
 			if aux == nil {
 				c.ops[value.msgId] = value
 				/* TODO FIX THIS N THE GLOBAL COUNTER
@@ -106,7 +106,7 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 				*/
 			}
 			//log.Println("OPS: ", len(c.ops))
-			log.Println("MAP ----- ++++ ", c.self, c.appendMap())
+			//log.Println("MAP ----- ++++ ", c.self, c.appendMap())
 		}
 	}
 }

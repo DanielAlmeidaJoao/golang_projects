@@ -33,7 +33,7 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 */
 func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	p.proposal_num++
-	log.Println("************************************************** going to propopse with ", clientValue.msgValue, p.proposal_num)
+	log.Println(p.self, "************************************************** going to propopse with ", clientValue.msgValue, clientValue.term, p.proposal_num)
 	p.promises = make([]*Promise, 3)
 	p.value = clientValue
 	p.acks = 0
@@ -120,7 +120,7 @@ func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, p
 		accept.value.proposalNum = p.proposal_num
 		p.acks++
 		if int(p.acks) == p.majority() {
-			log.Println(p.self, " ?????? DECIDING ")
+			log.Println(p.self, " ?????? DECIDED AND TERM ", accept.value.msgValue, accept.value.term)
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, accept.value, ON_DECIDE_ID)
 			}

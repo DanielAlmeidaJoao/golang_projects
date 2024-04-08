@@ -57,13 +57,11 @@ func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoS
 
 // type LocalProtoComHandlerFunc func(sourceProto APP_PROTO_ID, destProto ProtoInterface, data interface{})
 func AcceptorValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.ProtoInterface, data interface{}) {
-	c, valid := destProto.(*AcceptorProto)
+	a, valid := destProto.(*AcceptorProto)
 	if valid {
-		value, ok := data.(uint32)
-		if ok {
-			c.term = value + 1
-		}
+		a.term += 1
 	}
+	a.accepted_value = nil
 }
 func (a *AcceptorProto) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return ACCEPTOR_PROTO_ID
