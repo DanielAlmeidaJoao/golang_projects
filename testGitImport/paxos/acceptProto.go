@@ -9,25 +9,30 @@ import (
 type AcceptorProto struct {
 	accepted_num   uint32
 	promised_num   uint32
+	term           uint32
 	accepted_value *PaxosMsg
 	protoManager   tcpChannel.ProtoListenerInterface
 }
 
-func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *AcceptorProto {
+func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *AcceptorProto {
 	return &AcceptorProto{
 		protoManager: listenerInterface,
+		term:         1,
 	}
 }
 func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	preparaMessage := ReadDataPrepareMessage(data)
 	log.Println("ON PREPARE 2 ", a.promised_num, preparaMessage.proposal_num, customConn.RemoteAddress().String())
-
+	if preparaMessage.term < a.term {
+		return
+	}
 	if a.promised_num < preparaMessage.proposal_num {
 		a.promised_num = preparaMessage.proposal_num
 		prom := &Promise{
 			accepted_value: a.accepted_value,
 			accepted_num:   a.accepted_num,
 			promised_num:   preparaMessage.proposal_num,
+			term:           preparaMessage.term,
 		}
 		customConn.SendData2(ACCEPTOR_PROTO_ID, PROPOSER_PROTO_ID, prom, ON_PROMISE_ID)
 	}
@@ -35,8 +40,10 @@ func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, proto
 
 func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	log.Println("ACCEPTOR RECEIVED ACCEPT MSG")
-
 	accptMessage := ReadDataAcceptMessage(data)
+	if accptMessage.term < a.term {
+		return
+	}
 	if a.promised_num <= accptMessage.proposal_num {
 		log.Println("INTO AACCEPTER ON ACCEPT")
 		a.promised_num = accptMessage.proposal_num
@@ -48,6 +55,16 @@ func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoS
 	}
 }
 
+// type LocalProtoComHandlerFunc func(sourceProto APP_PROTO_ID, destProto ProtoInterface, data interface{})
+func AcceptorValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.ProtoInterface, data interface{}) {
+	c, valid := destProto.(*AcceptorProto)
+	if valid {
+		value, ok := data.(uint32)
+		if ok {
+			c.term = value + 1
+		}
+	}
+}
 func (a *AcceptorProto) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return ACCEPTOR_PROTO_ID
 }

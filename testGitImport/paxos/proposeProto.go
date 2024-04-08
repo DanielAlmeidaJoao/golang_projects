@@ -14,11 +14,15 @@ type ProposerProtocol struct {
 	promises     []*Promise //promises received from acceptors
 	peers        map[string]*tcpChannel.CustomConnection
 	ProtoManager tcpChannel.ProtoListenerInterface
+	currentTerm  uint32
+	self         string
 }
 
-func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *ProposerProtocol {
+func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *ProposerProtocol {
 	return &ProposerProtocol{
 		ProtoManager: listenerInterface,
+		currentTerm:  1,
+		self:         address,
 	}
 }
 
@@ -28,14 +32,17 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface) *P
    This will be called also after abort to try again.
 */
 func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
-	p.proposal_num = p.proposal_num + 1
+	p.proposal_num++
+	log.Println("************************************************** going to propopse with ", clientValue.msgValue, p.proposal_num)
 	p.promises = make([]*Promise, 3)
 	p.value = clientValue
 	p.acks = 0
 	p.promises = nil
 	prepMessage := &PrepareMessage{
 		proposal_num: p.proposal_num,
+		term:         clientValue.term,
 	}
+	p.currentTerm = clientValue.term
 	for _, v := range p.peers {
 		v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, prepMessage, ON_PREPARE_ID)
 	}
@@ -68,6 +75,9 @@ This function is called when the proposer receives a promise message from one of
 func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	promise := ReadData(data)
 	log.Println("ACCEPTED PROMISE from ", customConn.RemoteAddress().String(), p.proposal_num, promise.promised_num)
+	if promise.term < p.currentTerm {
+		return
+	}
 	if promise.promised_num == 0 {
 		promise.promised_num = p.proposal_num
 		promise.accepted_value = p.value
@@ -85,6 +95,7 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 			amsg := &AcceptMessage{
 				value:        p.value,
 				proposal_num: p.proposal_num,
+				term:         promise.term,
 			}
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, amsg, ON_ACCEPT_ID)
@@ -101,22 +112,19 @@ This function is called when the proposer receives an accepted message from one 
 func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	log.Println("ACCEPTED ACCEPTED")
 	accept := ReadDataAcceptMessage(data)
+	if accept.term < p.currentTerm {
+		return
+	}
 	p.promises = make([]*Promise, 3)
 	if p.proposal_num == accept.proposal_num {
+		accept.value.proposalNum = p.proposal_num
 		p.acks++
 		if int(p.acks) == p.majority() {
+			log.Println(p.self, " ?????? DECIDING ")
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, accept.value, ON_DECIDE_ID)
 			}
 		}
-	}
-}
-
-// the accepter should just ignore it
-func (p *ProposerProtocol) onNack(proposal_num uint32) {
-	if p.proposal_num == proposal_num {
-		//abort
-		p.proposal_num = 0
 	}
 }
 

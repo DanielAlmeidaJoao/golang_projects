@@ -22,10 +22,10 @@ func main() {
 	//fmt.Println(protocolsManager)
 	fmt.Println(protocolsManager)
 
-	proposer := paxos.NewProposerProtocol(protocolsManager)
-	client := paxos.NewClientProtocol(protocolsManager, proposer)
-	acceptor := paxos.NewAcceptorProtocol(protocolsManager)
-	learner := paxos.NewLearnerProtocol(protocolsManager, client)
+	proposer := paxos.NewProposerProtocol(protocolsManager, selfAddress)
+	client := paxos.NewClientProtocol(protocolsManager, proposer, selfAddress)
+	acceptor := paxos.NewAcceptorProtocol(protocolsManager, selfAddress)
+	learner := paxos.NewLearnerProtocol(protocolsManager, selfAddress)
 
 	protocolsManager.StartProtocol(proposer)
 	protocolsManager.StartProtocol(acceptor)

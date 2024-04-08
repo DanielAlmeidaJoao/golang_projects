@@ -21,8 +21,10 @@ const (
 )
 
 type PaxosMsg struct {
-	msgId    string
-	msgValue string
+	msgId       string
+	msgValue    string
+	proposalNum uint32
+	term        uint32
 }
 
 func (receiver *PaxosMsg) SerializeData(writer *tcpChannel.CustomWriter) {
@@ -38,6 +40,8 @@ func (p *PaxosMsg) WritePaxosMsg(writer *tcpChannel.CustomWriter) {
 		writer.WriteString(p.msgId)
 		writer.WriteUInt32(uint32(len(p.msgValue)))
 		writer.WriteString(p.msgValue)
+		writer.WriteUInt32(p.proposalNum)
+		writer.WriteUInt32(p.term)
 	}
 }
 
@@ -55,6 +59,9 @@ func ReadPaxosMsg(data *tcpChannel.CustomReader) *PaxosMsg {
 		bytes = make([]byte, msgValueLen)
 		data.Read(bytes)
 		msg.msgValue = string(bytes)
+		proposalNum, _ := data.ReadUint32()
+		msg.proposalNum = proposalNum
+		msg.term, _ = data.ReadUint32()
 	} else {
 		msg = nil
 	}
@@ -63,32 +70,40 @@ func ReadPaxosMsg(data *tcpChannel.CustomReader) *PaxosMsg {
 
 type PrepareMessage struct {
 	proposal_num uint32
+	term         uint32
 }
 
 func (receiver *PrepareMessage) SerializeData(writer *tcpChannel.CustomWriter) {
 	writer.WriteUInt32(receiver.proposal_num)
+	writer.WriteUInt32(receiver.term)
 }
 func ReadDataPrepareMessage(reader *tcpChannel.CustomReader) *PrepareMessage {
 	accepted_num, _ := reader.ReadUint32()
+	termNum, _ := reader.ReadUint32()
 	return &PrepareMessage{
 		proposal_num: accepted_num,
+		term:         termNum,
 	}
 }
 
 type AcceptMessage struct {
 	proposal_num uint32
+	term         uint32
 	value        *PaxosMsg
 }
 
 func (receiver *AcceptMessage) SerializeData(writer *tcpChannel.CustomWriter) {
 	writer.WriteUInt32(receiver.proposal_num)
+	writer.WriteUInt32(receiver.term)
 	receiver.value.WritePaxosMsg(writer)
 }
 func ReadDataAcceptMessage(reader *tcpChannel.CustomReader) *AcceptMessage {
 	accepted_num, _ := reader.ReadUint32()
+	termNum, _ := reader.ReadUint32()
 	msg := ReadPaxosMsg(reader)
 	return &AcceptMessage{
 		proposal_num: accepted_num,
+		term:         termNum,
 		value:        msg,
 	}
 }
@@ -96,19 +111,26 @@ func ReadDataAcceptMessage(reader *tcpChannel.CustomReader) *AcceptMessage {
 type Promise struct {
 	accepted_num   uint32
 	promised_num   uint32
+	term           uint32
 	accepted_value *PaxosMsg
 }
 
 func (receiver *Promise) SerializeData(writer *tcpChannel.CustomWriter) {
 	writer.WriteUInt32(receiver.accepted_num)
+	writer.WriteUInt32(receiver.promised_num)
+	writer.WriteUInt32(receiver.term)
 	receiver.accepted_value.WritePaxosMsg(writer)
 }
 
 func ReadData(reader *tcpChannel.CustomReader) *Promise {
-	accepted_num, _ := reader.ReadUint32()
+	acceptedNum, _ := reader.ReadUint32()
+	promisedNum, _ := reader.ReadUint32()
+	termNum, _ := reader.ReadUint32()
 	msg := ReadPaxosMsg(reader)
 	return &Promise{
-		accepted_num:   accepted_num,
+		accepted_num:   acceptedNum,
+		promised_num:   promisedNum,
+		term:           termNum,
 		accepted_value: msg,
 	}
 }
