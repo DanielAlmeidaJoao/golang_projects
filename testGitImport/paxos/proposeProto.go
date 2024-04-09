@@ -8,14 +8,15 @@ import (
 
 // the state of the proposer
 type ProposerProtocol struct {
-	value        *PaxosMsg //proposed value
-	proposal_num uint32    //proposal number
-	acks         uint32    //number of acks received from acceptors
-	promises     int       //promises received from acceptors
-	peers        map[string]*tcpChannel.CustomConnection
-	ProtoManager tcpChannel.ProtoListenerInterface
-	currentTerm  uint32
-	self         string
+	value         *PaxosMsg //proposed value
+	proposal_num  uint32    //proposal number
+	acks          uint32    //number of acks received from acceptors
+	promises      int       //promises received from acceptors
+	peers         map[string]*tcpChannel.CustomConnection
+	ProtoManager  tcpChannel.ProtoListenerInterface
+	currentTerm   uint32
+	self          string
+	valueToDecide *PaxosMsg
 }
 
 func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *ProposerProtocol {
@@ -89,11 +90,17 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 		if p.promises == p.majority() {
 			p.acks = 0
 			p.promises = 0
+			/**
 			if promise.accepted_num > p.proposal_num {
 				p.value = promise.accepted_value
+			}**/
+			if p.value.msgId != p.value.msgId {
+				p.valueToDecide = promise.accepted_value
+			} else {
+				p.valueToDecide = p.value
 			}
 			amsg := &AcceptMessage{
-				value:        p.value,
+				value:        p.valueToDecide,
 				proposal_num: p.proposal_num,
 				term:         promise.term,
 			}

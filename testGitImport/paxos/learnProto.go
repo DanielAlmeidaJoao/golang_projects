@@ -12,6 +12,7 @@ type LearnerProto struct {
 	protoManager  tcpChannel.ProtoListenerInterface
 	self          string
 	currentTerm   uint32
+	decided       map[uint32]*PaxosMsg
 }
 
 func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *LearnerProto {
@@ -19,19 +20,28 @@ func NewLearnerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, add
 		protoManager: listenerInterface,
 		self:         address,
 		currentTerm:  1,
+		decided:      make(map[uint32]*PaxosMsg, 1000),
 	}
 }
 func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	value := ReadPaxosMsg(data)
 	if receiver.currentTerm == value.term {
-		receiver.currentTerm++
-		//log.Println(receiver.self, " WWWWWWW DECISION TAKEN ", value)
-		// func(sourceProto APP_PROTO_ID, destProto APP_PROTO_ID, data interface{})
-		_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, value, ValueDecided)                //registar no server
-		_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), ACCEPTOR_PROTO_ID, value.term, AcceptorValueDecided) //registar no server
+		for {
+			receiver.currentTerm++
+			//log.Println(receiver.self, " WWWWWWW DECISION TAKEN ", value)
+			// func(sourceProto APP_PROTO_ID, destProto APP_PROTO_ID, data interface{})
+			_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, value, ValueDecided)                //registar no server
+			_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), ACCEPTOR_PROTO_ID, value.term, AcceptorValueDecided) //registar no server
 
-		receiver.decided_value = value
+			receiver.decided_value = value
+			value = receiver.decided[receiver.currentTerm]
+			if value == nil {
+				return
+			}
+		}
 		//TODO sendRequestToClient
+	} else if receiver.currentTerm < value.term {
+		receiver.decided[value.term] = value
 	}
 }
 

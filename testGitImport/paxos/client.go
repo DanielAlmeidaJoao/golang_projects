@@ -1,6 +1,9 @@
 package paxos
 
 import (
+	list2 "container/list"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/DanielAlmeidaJoao/goDistributedLibrary/tcpChannel"
 	"log"
@@ -17,7 +20,7 @@ ProtocolUniqueId() APP_PROTO_ID
 */
 
 type ClientProtocol struct {
-	ops          map[string]*PaxosMsg
+	ops          *list2.List
 	count        int
 	protoManager tcpChannel.ProtoListenerInterface
 	proper       *ProposerProtocol
@@ -29,7 +32,7 @@ type ClientProtocol struct {
 
 func NewClientProtocol(listenerInterface tcpChannel.ProtoListenerInterface, proposer *ProposerProtocol, address string) *ClientProtocol {
 	return &ClientProtocol{
-		ops:          make(map[string]*PaxosMsg),
+		ops:          list2.New(),
 		protoManager: listenerInterface,
 		count:        0,
 		proper:       proposer,
@@ -53,7 +56,7 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 }
 func (c *ClientProtocol) nextProposal() *PaxosMsg {
 	c.count++
-	if c.count == 10 {
+	if c.count == 1000 {
 		return nil
 	}
 	return &PaxosMsg{
@@ -62,10 +65,7 @@ func (c *ClientProtocol) nextProposal() *PaxosMsg {
 		term:     c.currentTerm,
 	}
 }
-func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data interface{}) {
-	if c.ops == nil {
-		c.ops = make(map[string]*PaxosMsg)
-	}
+func (c *ClientProtocol) handleTimer(handlerId int, sourceProto tcpChannel.APP_PROTO_ID, data interface{}) {
 	msg := c.nextProposal()
 	c.lastProposed = msg
 	msg.proposalNum = c.global_count + 1
@@ -74,19 +74,36 @@ func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data i
 	err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, msg, f) //registar no server
 	log.Println("ERROR REGISTERING PROTO", err2)
 }
+
 func (c *ClientProtocol) appendMap() string {
 	aux := ""
-	for _, v := range c.ops {
-		aux = fmt.Sprintf("%s <VALUE: %s TERM: %d ; PROPOSAL NUM: %d>", aux, v.msgValue, v.term, v.proposalNum)
+	size := c.ops.Len()
+	fmt.Println(c.self, " <", size, ">")
+
+	if size > 0 {
+		first := c.ops.Front()
+		h := sha256.New()
+		for i := 0; i < size; i++ {
+			value, ok := first.Value.(*PaxosMsg)
+			if ok {
+				h.Write([]byte(value.msgValue))
+				//aux = fmt.Sprintf("%s <VALUE: %s TERM: %d ; PROPOSAL NUM: %d>", aux, value.msgValue, value.term, value.proposalNum)
+			}
+			first = first.Next()
+		}
+		aux = fmt.Sprintf("SERVER: %s -- SIZE: %d -- HASH: %s -- VALUES: %s", c.self, size, hex.EncodeToString(h.Sum(nil)), aux)
 	}
 	return aux
 }
-func (c *ClientProtocol) PeriodicTimerHandler(proto tcpChannel.APP_PROTO_ID, message interface{}) {
+func (c *ClientProtocol) PeriodicTimerHandler(handlerId int, proto tcpChannel.APP_PROTO_ID, message interface{}) {
 	log.Println("MAP ----- ++++ ", c.self, c.appendMap())
 }
 
 // type LocalProtoComHandlerFunc func(sourceProto APP_PROTO_ID, destProto ProtoInterface, data interface{})
 func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.ProtoInterface, data interface{}) {
+	l := list2.New()
+	l.PushBack(12)
+	l.Len()
 	c, valid := destProto.(*ClientProtocol)
 	if valid {
 
@@ -96,7 +113,7 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 				c.currentTerm += 1
 			}
 			c.global_count = value.proposalNum
-			aux := c.ops[value.msgId]
+			c.ops.PushBack(value)
 
 			if c.lastProposed != nil && value.msgId == c.lastProposed.msgId {
 				c.lastProposed = c.nextProposal()
@@ -108,27 +125,10 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, f) //registar no server
 			}
 
-			if aux == nil {
-				c.ops[value.msgId] = value
-				/* TODO FIX THIS N THE GLOBAL COUNTER
-				aux = c.GetNonZero()
-				f := SendPaxosRequest
-				err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, aux, f) //registar no server
-				log.Println("ERROR REGISTERING PROTO", err2)
-				*/
-			}
-			//log.Println("OPS: ", len(c.ops))
 		}
 	}
 }
-func (c *ClientProtocol) GetNonZero() *PaxosMsg {
-	for _, v := range c.ops {
-		if v != nil {
-			return v
-		}
-	}
-	return nil
-}
+
 func (c *ClientProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
 	time.Sleep(time.Second * 5)
 	channelInterface.OpenConnection("127.0.0.1", 8080, c.ProtocolUniqueId())
