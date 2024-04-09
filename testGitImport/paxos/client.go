@@ -51,15 +51,22 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 		log.Println("ERROR CONVERTING")
 	}
 }
+func (c *ClientProtocol) nextProposal() *PaxosMsg {
+	c.count++
+	if c.count == 10 {
+		return nil
+	}
+	return &PaxosMsg{
+		msgId:    fmt.Sprintf("%s_%d", c.self, c.count),
+		msgValue: fmt.Sprintf("MSG_IS_%s_%d", c.self, c.count),
+		term:     c.currentTerm,
+	}
+}
 func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data interface{}) {
 	if c.ops == nil {
 		c.ops = make(map[string]*PaxosMsg)
 	}
-	msg := &PaxosMsg{
-		msgId:    c.self,
-		msgValue: fmt.Sprintf("SELF IS %s", c.self),
-		term:     c.currentTerm,
-	}
+	msg := c.nextProposal()
 	c.lastProposed = msg
 	msg.proposalNum = c.global_count + 1
 	log.Println("----------------------------------------------------------------------------------------------- timer triggereed")
@@ -70,9 +77,12 @@ func (c *ClientProtocol) handleTimer(sourceProto tcpChannel.APP_PROTO_ID, data i
 func (c *ClientProtocol) appendMap() string {
 	aux := ""
 	for _, v := range c.ops {
-		aux = fmt.Sprintf("%s ; VALUE: %s TERM: %d ; PROPOSAL NUM: %d ]", aux, v.msgValue, v.term, v.proposalNum)
+		aux = fmt.Sprintf("%s <VALUE: %s TERM: %d ; PROPOSAL NUM: %d>", aux, v.msgValue, v.term, v.proposalNum)
 	}
 	return aux
+}
+func (c *ClientProtocol) PeriodicTimerHandler(proto tcpChannel.APP_PROTO_ID, message interface{}) {
+	log.Println("MAP ----- ++++ ", c.self, c.appendMap())
 }
 
 // type LocalProtoComHandlerFunc func(sourceProto APP_PROTO_ID, destProto ProtoInterface, data interface{})
@@ -88,14 +98,16 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			c.global_count = value.proposalNum
 			aux := c.ops[value.msgId]
 
-			log.Println("FUCKKKKK SELF AND GOT ", c.lastProposed.msgValue, value.msgValue, c.currentTerm, value.term)
-
-			if value.msgId != c.lastProposed.msgId {
+			if c.lastProposed != nil && value.msgId == c.lastProposed.msgId {
+				c.lastProposed = c.nextProposal()
+			}
+			if c.lastProposed != nil {
 				c.lastProposed.term = c.currentTerm
 				c.lastProposed.proposalNum = c.global_count
 				f := SendPaxosRequest
 				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, f) //registar no server
 			}
+
 			if aux == nil {
 				c.ops[value.msgId] = value
 				/* TODO FIX THIS N THE GLOBAL COUNTER
@@ -106,7 +118,6 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 				*/
 			}
 			//log.Println("OPS: ", len(c.ops))
-			//log.Println("MAP ----- ++++ ", c.self, c.appendMap())
 		}
 	}
 }
@@ -124,6 +135,8 @@ func (c *ClientProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
 	channelInterface.OpenConnection("127.0.0.1", 8081, c.ProtocolUniqueId())
 	channelInterface.OpenConnection("127.0.0.1", 8082, c.ProtocolUniqueId())
 	c.protoManager.RegisterTimeout(c.ProtocolUniqueId(), time.Second*5, nil, c.handleTimer)
+	timerId := c.protoManager.RegisterPeriodicTimeout(c.ProtocolUniqueId(), time.Second*30, nil, c.PeriodicTimerHandler)
+	log.Println("REGISTERED TIME ID IS : ", timerId)
 }
 func (c *ClientProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
 

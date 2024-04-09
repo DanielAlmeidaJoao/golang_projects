@@ -8,10 +8,10 @@ import (
 
 // the state of the proposer
 type ProposerProtocol struct {
-	value        *PaxosMsg  //proposed value
-	proposal_num uint32     //proposal number
-	acks         uint32     //number of acks received from acceptors
-	promises     []*Promise //promises received from acceptors
+	value        *PaxosMsg //proposed value
+	proposal_num uint32    //proposal number
+	acks         uint32    //number of acks received from acceptors
+	promises     int       //promises received from acceptors
 	peers        map[string]*tcpChannel.CustomConnection
 	ProtoManager tcpChannel.ProtoListenerInterface
 	currentTerm  uint32
@@ -23,6 +23,7 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 		ProtoManager: listenerInterface,
 		currentTerm:  1,
 		self:         address,
+		promises:     0,
 	}
 }
 
@@ -33,16 +34,16 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 */
 func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	p.proposal_num++
-	log.Println(p.self, "************************************************** going to propopse with ", clientValue.msgValue, clientValue.term, p.proposal_num)
-	p.promises = make([]*Promise, 3)
+	//log.Println(p.self, "************************************************** going to propopse with ", clientValue.msgValue, clientValue.term, p.proposal_num)
 	p.value = clientValue
 	p.acks = 0
-	p.promises = nil
 	prepMessage := &PrepareMessage{
 		proposal_num: p.proposal_num,
 		term:         clientValue.term,
 	}
 	p.currentTerm = clientValue.term
+	p.promises = 0
+	p.acks = 0
 	for _, v := range p.peers {
 		v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, prepMessage, ON_PREPARE_ID)
 	}
@@ -78,20 +79,19 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 	if promise.term < p.currentTerm {
 		return
 	}
-	if promise.promised_num == 0 {
+	if promise.accepted_value == nil {
 		promise.promised_num = p.proposal_num
 		promise.accepted_value = p.value
 	}
+
 	if promise.promised_num == p.proposal_num {
-		p.promises = append(p.promises, promise)
-		majority := p.majority()
-		if len(p.promises) == majority {
-			aux := p.MaxValue(p.promises)
-			if p.value.msgId != aux.accepted_value.msgId {
-				p.acks = 0
+		p.promises++
+		if p.promises == p.majority() {
+			p.acks = 0
+			p.promises = 0
+			if promise.accepted_num > p.proposal_num {
+				p.value = promise.accepted_value
 			}
-			p.value = aux.accepted_value
-			p.promises = make([]*Promise, 3)
 			amsg := &AcceptMessage{
 				value:        p.value,
 				proposal_num: p.proposal_num,
@@ -100,7 +100,6 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, amsg, ON_ACCEPT_ID)
 			}
-			p.promises = make([]*Promise, len(p.peers))
 		}
 	}
 
@@ -115,12 +114,13 @@ func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, p
 	if accept.term < p.currentTerm {
 		return
 	}
-	p.promises = make([]*Promise, 3)
 	if p.proposal_num == accept.proposal_num {
 		accept.value.proposalNum = p.proposal_num
 		p.acks++
 		if int(p.acks) == p.majority() {
-			log.Println(p.self, " ?????? DECIDED AND TERM ", accept.value.msgValue, accept.value.term)
+			p.currentTerm++
+			p.acks = 0
+			log.Println(p.self, " ?????? ", accept.value.msgValue, "TERM ", accept.value.term, " PROMISE COUNT", p.promises)
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, accept.value, ON_DECIDE_ID)
 			}
@@ -132,11 +132,11 @@ func (a *ProposerProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return PROPOSER_PROTO_ID
 }
 func (a *ProposerProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
-	err1 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
+	//err1 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
 	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, a.onPromise)   //registar no server
 	err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, a.onAccepted) //registar no server
 
-	log.Println("REGISTER MSG HANDLERS: ", err1, err2, err3)
+	log.Println("REGISTER MSG HANDLERS: ", err2, err3)
 }
 func (a *ProposerProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
 
