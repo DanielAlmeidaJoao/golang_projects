@@ -4,19 +4,22 @@ import (
 	"github.com/DanielAlmeidaJoao/goDistributedLibrary/tcpChannel"
 	"log"
 	"math"
+	"math/rand"
+	"time"
 )
 
 // the state of the proposer
 type ProposerProtocol struct {
-	value         *PaxosMsg //proposed value
-	proposal_num  uint32    //proposal number
-	acks          uint32    //number of acks received from acceptors
-	promises      int       //promises received from acceptors
-	peers         map[string]*tcpChannel.CustomConnection
-	ProtoManager  tcpChannel.ProtoListenerInterface
-	currentTerm   uint32
-	self          string
-	valueToDecide *PaxosMsg
+	value        *PaxosMsg //proposed value
+	proposal_num uint32    //proposal number
+	acks         uint32    //number of acks received from acceptors
+	promises     int       //promises received from acceptors
+	peers        map[string]*tcpChannel.CustomConnection
+	ProtoManager tcpChannel.ProtoListenerInterface
+	currentTerm  uint32
+	self         string
+	rd           *rand.Rand
+	timerId      int
 }
 
 func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *ProposerProtocol {
@@ -28,44 +31,41 @@ func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 	}
 }
 
-//func (p *ProtoEcho) ClientHandleMessage(customConn *protoListener.CustomConnection, protoSource protoListener.APP_PROTO_ID, data *protoListener.CustomReader) {
-/*
-   The client calls this function of the proposer to propose its desired value.
-   This will be called also after abort to try again.
-*/
 func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
-	p.proposal_num++
-	//log.Println(p.self, "************************************************** going to propopse with ", clientValue.msgValue, clientValue.term, p.proposal_num)
+	p.currentTerm = clientValue.term
+	if clientValue.msgId == "" {
+		p.value = nil
+		p.ProtoManager.CancelTimer(p.timerId)
+		p.timerId = -1
+		return
+	}
+	if p.timerId <= 0 {
+		p.timerId = p.ProtoManager.RegisterPeriodicTimeout(p.ProtocolUniqueId(), time.Millisecond*time.Duration(150+p.rd.Intn(500)), nil, p.PeriodicTimerHandler)
+	}
+	p.proposal_num++ //uint32(1 + p.rd.Intn(time.Now().Nanosecond()))
+	clientValue.proposalNum = p.proposal_num
 	p.value = clientValue
-	p.acks = 0
 	prepMessage := &PrepareMessage{
 		proposal_num: p.proposal_num,
 		term:         clientValue.term,
 	}
-	p.currentTerm = clientValue.term
 	p.promises = 0
 	p.acks = 0
+	//log.Println("GOING TO PROPOSE ............................. <SELF,TERM,PROP_NUM>", p.self, p.currentTerm, p.proposal_num)
 	for _, v := range p.peers {
 		v.SendData2(PROPOSER_PROTO_ID, ACCEPTOR_PROTO_ID, prepMessage, ON_PREPARE_ID)
 	}
 }
+func (c *ProposerProtocol) PeriodicTimerHandler(handlerId int, proto tcpChannel.APP_PROTO_ID, message interface{}) {
+	if c.value != nil {
+		//log.Println("TIMER TRIGGERTED 7777777777777777777777777777777777777777777777777777777777777777777777777777")
+		c.OnProposeClientCall(c.value)
+	} else {
+		c.timerId = -1
+		c.ProtoManager.CancelTimer(handlerId)
+	}
+}
 
-func (p *ProposerProtocol) onPropose(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
-	msg := ReadPaxosMsg(data)
-	p.OnProposeClientCall(msg)
-}
-func (p *ProposerProtocol) MaxValue(promises []*Promise) *Promise {
-	aux := promises[0]
-	for _, v := range promises {
-		if v.accepted_value != nil {
-			aux = v
-		}
-	}
-	if aux.accepted_value == nil {
-		aux.accepted_value = p.value
-	}
-	return aux
-}
 func (p *ProposerProtocol) majority() int {
 	return int(math.Ceil(float64((len(p.peers) + 1) / 2)))
 }
@@ -76,31 +76,21 @@ This function is called when the proposer receives a promise message from one of
 */
 func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	promise := ReadData(data)
-	log.Println("ACCEPTED PROMISE from ", customConn.RemoteAddress().String(), p.proposal_num, promise.promised_num)
-	if promise.term < p.currentTerm {
+	if promise.term != p.currentTerm {
 		return
 	}
 	if promise.accepted_value == nil {
-		promise.promised_num = p.proposal_num
 		promise.accepted_value = p.value
 	}
-
 	if promise.promised_num == p.proposal_num {
 		p.promises++
+		//log.Println("9999999999999999999999999999999999999999999999999999 RECEIVED PROMISE REPLY : <SELF,TERM,PROPOSAL_NUM,COUNT>", p.self, p.currentTerm, p.proposal_num, p.promises)
 		if p.promises == p.majority() {
-			p.acks = 0
+			promise.accepted_value.proposalNum = p.proposal_num
+			promise.accepted_value.term = p.currentTerm
 			p.promises = 0
-			/**
-			if promise.accepted_num > p.proposal_num {
-				p.value = promise.accepted_value
-			}**/
-			if p.value.msgId != p.value.msgId {
-				p.valueToDecide = promise.accepted_value
-			} else {
-				p.valueToDecide = p.value
-			}
 			amsg := &AcceptMessage{
-				value:        p.valueToDecide,
+				value:        promise.accepted_value,
 				proposal_num: p.proposal_num,
 				term:         promise.term,
 			}
@@ -115,19 +105,17 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 /*
 This function is called when the proposer receives an accepted message from one of the acceptors.
 */
+
 func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
-	log.Println("ACCEPTED ACCEPTED")
 	accept := ReadDataAcceptMessage(data)
-	if accept.term < p.currentTerm {
+	if accept.term != p.currentTerm {
 		return
 	}
 	if p.proposal_num == accept.proposal_num {
 		accept.value.proposalNum = p.proposal_num
 		p.acks++
 		if int(p.acks) == p.majority() {
-			p.currentTerm++
 			p.acks = 0
-			log.Println(p.self, " ?????? ", accept.value.msgValue, "TERM ", accept.value.term, " PROMISE COUNT", p.promises)
 			for _, v := range p.peers {
 				v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, accept.value, ON_DECIDE_ID)
 			}
@@ -139,11 +127,12 @@ func (a *ProposerProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return PROPOSER_PROTO_ID
 }
 func (a *ProposerProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
+	a.rd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	//err1 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
-	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, a.onPromise)   //registar no server
-	err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, a.onAccepted) //registar no server
+	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, a.onPromise) //registar no server
+	//err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, a.onAccepted) //registar no server
 
-	log.Println("REGISTER MSG HANDLERS: ", err2, err3)
+	log.Println("REGISTER MSG HANDLERS: ", err2)
 }
 func (a *ProposerProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
 

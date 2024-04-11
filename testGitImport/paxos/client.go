@@ -24,7 +24,6 @@ type ClientProtocol struct {
 	count        int
 	protoManager tcpChannel.ProtoListenerInterface
 	proper       *ProposerProtocol
-	global_count uint32
 	currentTerm  uint32
 	lastProposed *PaxosMsg
 	self         string
@@ -68,7 +67,6 @@ func (c *ClientProtocol) nextProposal() *PaxosMsg {
 func (c *ClientProtocol) handleTimer(handlerId int, sourceProto tcpChannel.APP_PROTO_ID, data interface{}) {
 	msg := c.nextProposal()
 	c.lastProposed = msg
-	msg.proposalNum = c.global_count + 1
 	log.Println("----------------------------------------------------------------------------------------------- timer triggereed")
 	f := SendPaxosRequest
 	err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, msg, f) //registar no server
@@ -112,7 +110,6 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			if c.currentTerm == value.term {
 				c.currentTerm += 1
 			}
-			c.global_count = value.proposalNum
 			c.ops.PushBack(value)
 
 			if c.lastProposed != nil && value.msgId == c.lastProposed.msgId {
@@ -120,9 +117,12 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			}
 			if c.lastProposed != nil {
 				c.lastProposed.term = c.currentTerm
-				c.lastProposed.proposalNum = c.global_count
 				f := SendPaxosRequest
 				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, f) //registar no server
+			}
+
+			if c.lastProposed == nil {
+				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, &PaxosMsg{term: c.currentTerm, msgId: ""}, SendPaxosRequest)
 			}
 
 		}

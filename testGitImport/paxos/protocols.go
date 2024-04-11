@@ -6,6 +6,7 @@ import (
 
 const (
 	PROPOSER_PROTO_default tcpChannel.APP_PROTO_ID = iota
+	PROPOSER_PROTO_default2
 	PROPOSER_PROTO_ID
 	ACCEPTOR_PROTO_ID
 	LEARNER_PROTO_ID
@@ -21,10 +22,11 @@ const (
 )
 
 type PaxosMsg struct {
-	msgId       string
-	msgValue    string
-	proposalNum uint32
-	term        uint32
+	msgId        string
+	msgValue     string
+	proposalNum  uint32
+	term         uint32
+	decidedCount uint32
 }
 
 func (receiver *PaxosMsg) SerializeData(writer *tcpChannel.CustomWriter) {
