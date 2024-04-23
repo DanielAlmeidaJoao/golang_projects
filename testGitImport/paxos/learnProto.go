@@ -34,7 +34,7 @@ func (p *LearnerProto) majority() int {
 	return int(math.Ceil(float64((len(p.peers) + 1) / 2)))
 }
 
-func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func (receiver *LearnerProto) onDecided(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	receiver.totalReceived++
 	value := ReadPaxosMsg(data)
 	if value.term < receiver.currentTerm {

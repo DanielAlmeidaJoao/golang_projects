@@ -34,7 +34,7 @@ func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 		terms:        make(map[uint32]*termArg, 100000),
 	}
 }
-func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func (a *AcceptorProto) onPrepare(selfProto tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	preparaMessage := ReadDataPrepareMessage(data)
 	arg := a.terms[preparaMessage.term]
 	if arg == nil {
@@ -69,7 +69,7 @@ func (a *AcceptorProto) setTermArg(accptMessage *AcceptMessage) *termArg {
 	return arg
 }
 
-func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func (a *AcceptorProto) onAccept(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	accptMessage := ReadDataAcceptMessage(data)
 	arg := a.setTermArg(accptMessage)
 	if arg.promised_num < accptMessage.proposal_num || (arg.promised_num == accptMessage.proposal_num && arg.remoteAddress <= customConn.RemoteAddress().String()) {

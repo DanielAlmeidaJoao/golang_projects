@@ -90,7 +90,11 @@ func (p *ProposerProtocol) setPromiseValue(accepted_value *PaxosMsg) {
 *
 This function is called when the proposer receives a promise message from one of the acceptors.
 */
-func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func onPromise(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	p, ok := protoInterface.(*ProposerProtocol)
+	if !ok {
+		return
+	}
 	promise := ReadData(data)
 	if promise.term != p.currentTerm {
 		return
@@ -125,7 +129,11 @@ func (p *ProposerProtocol) onPromise(customConn *tcpChannel.CustomConnection, pr
 This function is called when the proposer receives an accepted message from one of the acceptors.
 */
 
-func (p *ProposerProtocol) onAccepted(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	p, ok := protoInterface.(*ProposerProtocol)
+	if !ok {
+		return
+	}
 	//log.Println("----------------------------- ------------------------------------- ON_ACCEPT_ID: <SELF,TERM,PROPOSAL_NUM>", p.self, p.currentTerm, p.proposal_num)
 	if p == nil {
 		log.Println("---------------------------------------------------------------------- ******************************************************************************")
@@ -154,8 +162,9 @@ func (a *ProposerProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 func (a *ProposerProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
 	a.rd = rand.New(rand.NewSource(time.Now().UnixNano()))
 	//err1 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
-	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, a.onPromise)   //registar no server
-	err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, a.onAccepted) //registar no server
+	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, onPromise)   //registar no server
+	err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, onAccepted) //registar no server
+	log.Println("---- OKKK  IS : ", a)
 
 	log.Println("REGISTER MSG HANDLERS: ", err2, err3)
 }
