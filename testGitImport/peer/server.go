@@ -27,10 +27,11 @@ func main() {
 	acceptor := paxos.NewAcceptorProtocol(protocolsManager, selfAddress)
 	learner := paxos.NewLearnerProtocol(protocolsManager, selfAddress)
 
-	protocolsManager.StartProtocol(proposer)
-	protocolsManager.StartProtocol(acceptor)
-	protocolsManager.StartProtocol(learner)
-	protocolsManager.StartProtocol(client)
+	//networkQueueSize int, timeoutQueueSize int, localCommQueueSize int
+	protocolsManager.StartProtocol(proposer, 100, 50, 20)
+	protocolsManager.StartProtocol(acceptor, 100, 50, 20)
+	protocolsManager.StartProtocol(learner, 100, 50, 20)
+	protocolsManager.StartProtocol(client, 20, 20, 20)
 
 	protocolsManager.WaitForProtocolsToEnd(false)
 

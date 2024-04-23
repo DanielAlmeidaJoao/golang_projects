@@ -15,3 +15,9 @@ github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.9 h1:MqEA9pgkr1yrKQchoepH
 github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.9/go.mod h1:YN4L14mGHAfcfeAp5Ckiu1ZEc7/GzIK1Q0NIGLDFxno=
 github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.10 h1:6LeS4SqNGLeN6usA6XmZ9QUmZGnOVaOnkUukVYb3nZU=
 github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.10/go.mod h1:YN4L14mGHAfcfeAp5Ckiu1ZEc7/GzIK1Q0NIGLDFxno=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.12 h1:jROF51zj3ZqBP69/swKr+hPdDPe+u1JuGGPAv+2Nw/8=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.12/go.mod h1:YN4L14mGHAfcfeAp5Ckiu1ZEc7/GzIK1Q0NIGLDFxno=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.13 h1:INWh0I01tfsN7ymIQrgMgKdDTT2eYACycdvrYOTvJe8=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.13/go.mod h1:YN4L14mGHAfcfeAp5Ckiu1ZEc7/GzIK1Q0NIGLDFxno=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.14 h1:1gTcsj0jsNduYttgp+lrAdqAVAFJ+k2DB4NNyaRjWOY=
+github.com/DanielAlmeidaJoao/goDistributedLibrary v1.0.14/go.mod h1:YN4L14mGHAfcfeAp5Ckiu1ZEc7/GzIK1Q0NIGLDFxno=

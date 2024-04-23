@@ -55,7 +55,7 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 }
 func (c *ClientProtocol) nextProposal() *PaxosMsg {
 	c.count++
-	if c.count == 1000 {
+	if c.count > 100000 {
 		return nil
 	}
 	return &PaxosMsg{
@@ -117,13 +117,15 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			}
 			if c.lastProposed != nil {
 				c.lastProposed.term = c.currentTerm
-				f := SendPaxosRequest
-				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, f) //registar no server
+				c.lastProposed.proposalNum = value.proposalNum
+				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, SendPaxosRequest) //registar no server
 			}
 
 			if c.lastProposed == nil {
-				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, &PaxosMsg{term: c.currentTerm, msgId: ""}, SendPaxosRequest)
+				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, &PaxosMsg{term: c.currentTerm, msgId: "", proposalNum: value.proposalNum}, SendPaxosRequest)
 			}
+
+			//log.Println("MAP ----- ++++ ", c.self, c.appendMap())
 
 		}
 	}

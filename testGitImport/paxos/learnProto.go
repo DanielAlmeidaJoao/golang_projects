@@ -45,28 +45,49 @@ func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection,
 	if aux == nil {
 		receiver.decided[value.term] = value
 		aux = value
-	} else if value.proposalNum > aux.proposalNum {
-		receiver.decided[value.term] = value
-		aux = value
-	} else if value.proposalNum < aux.proposalNum {
-		return
-	} else if value.msgId != aux.msgId {
-		delete(receiver.decided, value.term)
-		return
 	}
-	aux.decidedCount++
-	for aux != nil && aux.term == receiver.currentTerm && aux.decidedCount >= uint32(receiver.majority()) {
-		//log.Println("333333333333333333333333 LEARNED 3333333333333333333333333333333333333333 <SELF,TERM,PROP_NUMBER> ", receiver.self, receiver.currentTerm, aux.proposalNum)
+	//log.Println("-------------LEARNED------------ <SELF,TERM,PROP_NUMBER,ID,COUNT--AUX_TERM> ", receiver.self, receiver.currentTerm, aux.proposalNum, aux.msgId, aux.decidedCount, aux.term)
+	for aux != nil && aux.term == receiver.currentTerm {
+		//log.Println("-------------LEARNED------------ <SELF,TERM,PROP_NUMBER,ID> ", receiver.self, receiver.currentTerm, aux.proposalNum, aux.msgId)
 		delete(receiver.decided, aux.term)
 		receiver.currentTerm++
 		aux2 := aux
-		_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, aux2, ValueDecided)           //registar no server
-		_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), ACCEPTOR_PROTO_ID, aux2, AcceptorValueDecided) //DA ERRO, ACESSO CONCORRENTE DO MAPA
+		_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, aux2, ValueDecided) //registar no server
+		//_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), ACCEPTOR_PROTO_ID, aux2, AcceptorValueDecided) //DA ERRO, ACESSO CONCORRENTE DO MAPA
 		//receiver.decided_value = value
 		aux = receiver.decided[receiver.currentTerm]
 	}
 }
 
+/*
+	func (receiver *LearnerProto) onDecided(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+		receiver.totalReceived++
+		value := ReadPaxosMsg(data)
+		if value.term < receiver.currentTerm {
+			return
+		}
+		//log.Println("0000000000000000000000000000000000 <SELF,TERM,PROP_NUMBER> ", receiver.self, value.term, value.proposalNum)
+		aux := receiver.decided[value.term]
+		if aux == nil || value.proposalNum > aux.proposalNum {
+			receiver.decided[value.term] = value
+			aux = value
+		} else if value.proposalNum < aux.proposalNum {
+			return
+		}
+		aux.decidedCount++
+		log.Println("-------------LEARNED------------ <SELF,TERM,PROP_NUMBER,ID,COUNT--AUX_TERM> ", receiver.self, receiver.currentTerm, aux.proposalNum, aux.msgId, aux.decidedCount, aux.term)
+		for aux != nil && aux.term == receiver.currentTerm && aux.decidedCount >= uint32(receiver.majority()) {
+			//log.Println("-------------LEARNED------------ <SELF,TERM,PROP_NUMBER,ID> ", receiver.self, receiver.currentTerm, aux.proposalNum, aux.msgId)
+			delete(receiver.decided, aux.term)
+			receiver.currentTerm++
+			aux2 := aux
+			_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), CLIENT_PROTO_ID, aux2, ValueDecided) //registar no server
+			//_ = receiver.protoManager.SendLocalEvent(receiver.ProtocolUniqueId(), ACCEPTOR_PROTO_ID, aux2, AcceptorValueDecided) //DA ERRO, ACESSO CONCORRENTE DO MAPA
+			//receiver.decided_value = value
+			aux = receiver.decided[receiver.currentTerm]
+		}
+	}
+*/
 func (a *LearnerProto) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return LEARNER_PROTO_ID
 }

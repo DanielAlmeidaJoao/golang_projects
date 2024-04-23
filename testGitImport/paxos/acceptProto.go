@@ -12,6 +12,7 @@ type termArg struct {
 	term           uint32
 	accepted_value *PaxosMsg
 	decided        *PaxosMsg
+	remoteAddress  string
 }
 
 /************************************ ***************************************/
@@ -30,7 +31,7 @@ func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface, ad
 		peers:        make(map[string]*tcpChannel.CustomConnection),
 		totalSent:    0,
 		self:         address,
-		terms:        make(map[uint32]*termArg),
+		terms:        make(map[uint32]*termArg, 100000),
 	}
 }
 func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
@@ -45,6 +46,7 @@ func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, proto
 	if arg.promised_num < preparaMessage.proposal_num {
 		//log.Println("2222222222222222222222222222 33333333333333333 ACCEPTING PREPARE: <SELF,TERM,PROSAL_NUM>", a.self, preparaMessage.term, preparaMessage.proposal_num)
 		arg.promised_num = preparaMessage.proposal_num
+		arg.remoteAddress = customConn.RemoteAddress().String()
 		prom := &Promise{
 			accepted_value: arg.accepted_value,
 			accepted_num:   arg.accepted_num,
@@ -55,25 +57,28 @@ func (a *AcceptorProto) onPrepare(customConn *tcpChannel.CustomConnection, proto
 	}
 }
 
-func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
-	accptMessage := ReadDataAcceptMessage(data)
+func (a *AcceptorProto) setTermArg(accptMessage *AcceptMessage) *termArg {
 	arg := a.terms[accptMessage.term]
 	if arg == nil {
 		arg = &termArg{
-			term: accptMessage.term,
+			term:           accptMessage.term,
+			accepted_value: accptMessage.value,
 		}
 		a.terms[accptMessage.term] = arg
 	}
-	if arg.promised_num <= accptMessage.proposal_num {
-		//log.Println("PROMISE 88888888888888888880000000000000000000111111111111 ACCEPTING PROMISE: <SELF,TERM,PROSAL_NUM>", a.self, accptMessage.term, accptMessage.proposal_num)
+	return arg
+}
+
+func (a *AcceptorProto) onAccept(customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	accptMessage := ReadDataAcceptMessage(data)
+	arg := a.setTermArg(accptMessage)
+	if arg.promised_num < accptMessage.proposal_num || (arg.promised_num == accptMessage.proposal_num && arg.remoteAddress <= customConn.RemoteAddress().String()) {
+		//log.Println("PROMISE 88888888888888888880000000000000000000111111111111 ACCEPTING PROMISE: <SELF,TERM,PROSAL_NUM>", a.self, accptMessage.term, accptMessage.proposal_num, accptMessage.value.msgId)
 		arg.promised_num = accptMessage.proposal_num
 		arg.accepted_num = accptMessage.proposal_num
 		arg.accepted_value = accptMessage.value
-		accptMessage.value.term = accptMessage.term
-		accptMessage.value.proposalNum = accptMessage.proposal_num
-		for _, v := range a.peers {
-			v.SendData2(ACCEPTOR_PROTO_ID, LEARNER_PROTO_ID, accptMessage.value, ON_DECIDE_ID)
-		}
+		arg.remoteAddress = customConn.RemoteAddress().String()
+		customConn.SendData2(ACCEPTOR_PROTO_ID, PROPOSER_PROTO_ID, accptMessage, ON_ACCEPTED_ID)
 		a.totalSent++
 	}
 }
