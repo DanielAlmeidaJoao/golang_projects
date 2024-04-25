@@ -143,10 +143,8 @@ func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel
 	if accept.term != p.currentTerm || p.proposal_num != accept.proposal_num {
 		return
 	}
-	if accept.value == nil {
-		return
-	}
-	accept.value.proposalNum = p.proposal_num
+	//accept.value.proposalNum = p.proposal_num
+	p.acceptValueCount.proposalNum = p.proposal_num
 	p.acks++
 	if int(p.acks) == p.majority() {
 		p.acks = 0

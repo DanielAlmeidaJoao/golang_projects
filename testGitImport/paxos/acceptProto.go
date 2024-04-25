@@ -77,6 +77,7 @@ func (a *AcceptorProto) onAccept(protoInterface tcpChannel.ProtoInterface, custo
 		arg.promised_num = accptMessage.proposal_num
 		arg.accepted_num = accptMessage.proposal_num
 		arg.accepted_value = accptMessage.value
+		arg.accepted_value.proposalNum = accptMessage.proposal_num
 		arg.remoteAddress = customConn.RemoteAddress().String()
 		customConn.SendData2(ACCEPTOR_PROTO_ID, PROPOSER_PROTO_ID, accptMessage, ON_ACCEPTED_ID)
 		a.totalSent++
