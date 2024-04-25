@@ -46,6 +46,7 @@ func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	if p.timerId <= 0 {
 		p.timerId = p.ProtoManager.RegisterPeriodicTimeout(p.ProtocolUniqueId(), time.Millisecond*time.Duration(150+p.rd.Intn(500)), nil, p.PeriodicTimerHandler)
 	}
+	// ola
 	//aux := len(p.peers) // time.Now().Nanosecond() %
 	p.proposal_num = clientValue.proposalNum + uint32(1+p.rd.Intn(100))
 	clientValue.proposalNum = p.proposal_num
