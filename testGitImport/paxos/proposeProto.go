@@ -11,17 +11,18 @@ import (
 
 // the state of the proposer
 type ProposerProtocol struct {
-	value          *PaxosMsg //proposed value
-	proposal_num   uint32    //proposal number
-	acks           uint32    //number of acks received from acceptors
-	promises       int       //promises received from acceptors
-	peers          map[string]*tcpChannel.CustomConnection
-	ProtoManager   tcpChannel.ProtoListenerInterface
-	currentTerm    uint32
-	self           string
-	rd             *rand.Rand
-	timerId        int
-	highestPromise *PaxosMsg
+	value            *PaxosMsg //proposed value
+	proposal_num     uint32    //proposal number
+	acks             uint32    //number of acks received from acceptors
+	promises         int       //promises received from acceptors
+	peers            map[string]*tcpChannel.CustomConnection
+	ProtoManager     tcpChannel.ProtoListenerInterface
+	currentTerm      uint32
+	self             string
+	rd               *rand.Rand
+	timerId          int
+	highestPromise   *PaxosMsg
+	acceptValueCount *PaxosMsg
 }
 
 func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *ProposerProtocol {
@@ -49,6 +50,7 @@ func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	p.proposal_num = clientValue.proposalNum + uint32(1+p.rd.Intn(100))
 	clientValue.proposalNum = p.proposal_num
 	p.highestPromise = nil
+	p.acceptValueCount = nil
 	p.value = clientValue
 	prepMessage := &PrepareMessage{
 		proposal_num: p.proposal_num,
@@ -110,8 +112,9 @@ func onPromise(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.
 			if p.highestPromise == nil {
 				return
 			}
-			p.highestPromise.proposalNum = p.proposal_num
+			//p.highestPromise.proposalNum = p.proposal_num
 			p.highestPromise.term = p.currentTerm
+			p.acceptValueCount = p.highestPromise
 			amsg := &AcceptMessage{
 				value:        p.highestPromise,
 				proposal_num: p.proposal_num,
@@ -135,10 +138,6 @@ func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel
 		return
 	}
 	//log.Println("----------------------------- ------------------------------------- ON_ACCEPT_ID: <SELF,TERM,PROPOSAL_NUM>", p.self, p.currentTerm, p.proposal_num)
-	if p == nil {
-		log.Println("---------------------------------------------------------------------- ******************************************************************************")
-		return
-	}
 	accept := ReadDataAcceptMessage(data)
 	if accept.term != p.currentTerm || p.proposal_num != accept.proposal_num {
 		return
@@ -150,8 +149,9 @@ func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel
 	p.acks++
 	if int(p.acks) == p.majority() {
 		p.acks = 0
+		//accept.value
 		for _, v := range p.peers {
-			v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, accept.value, ON_DECIDE_ID)
+			v.SendData2(PROPOSER_PROTO_ID, LEARNER_PROTO_ID, p.acceptValueCount, ON_DECIDE_ID)
 		}
 	}
 }

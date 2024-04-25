@@ -55,7 +55,7 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 }
 func (c *ClientProtocol) nextProposal() *PaxosMsg {
 	c.count++
-	if c.count > 500000 {
+	if c.count > 100000 {
 		return nil
 	}
 	return &PaxosMsg{

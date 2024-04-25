@@ -61,8 +61,7 @@ func (a *AcceptorProto) setTermArg(accptMessage *AcceptMessage) *termArg {
 	arg := a.terms[accptMessage.term]
 	if arg == nil {
 		arg = &termArg{
-			term:           accptMessage.term,
-			accepted_value: accptMessage.value,
+			term: accptMessage.term,
 		}
 		a.terms[accptMessage.term] = arg
 	}
@@ -72,8 +71,9 @@ func (a *AcceptorProto) setTermArg(accptMessage *AcceptMessage) *termArg {
 func (a *AcceptorProto) onAccept(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	accptMessage := ReadDataAcceptMessage(data)
 	arg := a.setTermArg(accptMessage)
-	if arg.promised_num < accptMessage.proposal_num || (arg.promised_num == accptMessage.proposal_num && arg.remoteAddress <= customConn.RemoteAddress().String()) {
+	if arg.promised_num < accptMessage.proposal_num || (arg.promised_num == accptMessage.proposal_num && arg.remoteAddress == customConn.RemoteAddress().String()) {
 		//log.Println("PROMISE 88888888888888888880000000000000000000111111111111 ACCEPTING PROMISE: <SELF,TERM,PROSAL_NUM>", a.self, accptMessage.term, accptMessage.proposal_num, accptMessage.value.msgId)
+
 		arg.promised_num = accptMessage.proposal_num
 		arg.accepted_num = accptMessage.proposal_num
 		arg.accepted_value = accptMessage.value
