@@ -27,6 +27,7 @@ type ClientProtocol struct {
 	currentTerm  uint32
 	lastProposed *PaxosMsg
 	self         string
+	start        int64
 }
 
 func NewClientProtocol(listenerInterface tcpChannel.ProtoListenerInterface, proposer *ProposerProtocol, address string) *ClientProtocol {
@@ -54,8 +55,12 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 	}
 }
 func (c *ClientProtocol) nextProposal() *PaxosMsg {
+	if c.start == 0 {
+		c.start = time.Now().UnixNano()
+	}
 	c.count++
-	if c.count > 100000 {
+	if c.count > 200000 {
+		log.Println(c.self, " -- ELAPSED IS -- : ", time.Now().UnixNano()-c.start)
 		return nil
 	}
 	return &PaxosMsg{
