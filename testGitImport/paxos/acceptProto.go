@@ -17,24 +17,23 @@ type termArg struct {
 
 /************************************ ***************************************/
 type AcceptorProto struct {
-	terms        map[uint32]*termArg
-	protoManager tcpChannel.ProtoListenerInterface
-	peers        map[string]*tcpChannel.CustomConnection
-	totalSent    int
-	self         string
-	proposer     string
+	terms       map[uint32]*termArg
+	protocolAPI tcpChannel.ProtocolAPI
+	peers       map[string]*tcpChannel.CustomConnection
+	totalSent   int
+	self        string
+	proposer    string
 }
 
-func NewAcceptorProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *AcceptorProto {
+func NewAcceptorProtocol(address string) *AcceptorProto {
 	return &AcceptorProto{
-		protoManager: listenerInterface,
-		peers:        make(map[string]*tcpChannel.CustomConnection),
-		totalSent:    0,
-		self:         address,
-		terms:        make(map[uint32]*termArg, 100000),
+		peers:     make(map[string]*tcpChannel.CustomConnection),
+		totalSent: 0,
+		self:      address,
+		terms:     make(map[uint32]*termArg, 100000),
 	}
 }
-func (a *AcceptorProto) onPrepare(selfProto tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func (a *AcceptorProto) onPrepare(selfProto tcpChannel.ProtocolAPI, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	preparaMessage := ReadDataPrepareMessage(data)
 	arg := a.terms[preparaMessage.term]
 	if arg == nil {
@@ -68,7 +67,7 @@ func (a *AcceptorProto) setTermArg(accptMessage *AcceptMessage) *termArg {
 	return arg
 }
 
-func (a *AcceptorProto) onAccept(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+func (a *AcceptorProto) onAccept(protoInterface tcpChannel.ProtocolAPI, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
 	accptMessage := ReadDataAcceptMessage(data)
 	arg := a.setTermArg(accptMessage)
 	if arg.promised_num < accptMessage.proposal_num || (arg.promised_num == accptMessage.proposal_num && arg.remoteAddress == customConn.RemoteAddress().String()) {
@@ -103,20 +102,21 @@ func AcceptorValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChan
 func (a *AcceptorProto) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return ACCEPTOR_PROTO_ID
 }
-func (a *AcceptorProto) OnStart(channelInterface tcpChannel.ChannelInterface) {
-	err1 := a.protoManager.RegisterNetworkMessageHandler(ON_PREPARE_ID, a.onPrepare) //registar no server
-	err2 := a.protoManager.RegisterNetworkMessageHandler(ON_ACCEPT_ID, a.onAccept)   //registar no server
+func (a *AcceptorProto) OnStart(protocolAPI tcpChannel.ProtocolAPI) {
+	a.protocolAPI = protocolAPI
+	err1 := a.protocolAPI.RegisterNetworkMessageHandler(ON_PREPARE_ID, a.onPrepare) //registar no server
+	err2 := a.protocolAPI.RegisterNetworkMessageHandler(ON_ACCEPT_ID, a.onAccept)   //registar no server
 	log.Println("REGISTER MSG HANDLERS ACCEPTOR PROTO: ", err1, err2)
-	a.protoManager.RegisterPeriodicTimeout(a.ProtocolUniqueId(), time.Second*300, nil, a.PeriodicTimerHandler)
+	a.protocolAPI.RegisterPeriodicTimeout(time.Second*300, nil, a.PeriodicTimerHandler)
 }
-func (a *AcceptorProto) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
+func (a *AcceptorProto) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ProtocolAPI) {
 
 }
-func (a *AcceptorProto) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (a *AcceptorProto) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	a.peers[customCon.RemoteAddress().String()] = customCon
 
 }
-func (a *AcceptorProto) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (a *AcceptorProto) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	log.Println("CONNECTION IS DOWN ", a.self)
 }
 func (c *AcceptorProto) PeriodicTimerHandler(handlerId int, proto tcpChannel.APP_PROTO_ID, message interface{}) {

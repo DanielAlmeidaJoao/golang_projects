@@ -1,5 +1,6 @@
 package paxos
 
+import "C"
 import (
 	list2 "container/list"
 	"crypto/sha256"
@@ -22,7 +23,7 @@ ProtocolUniqueId() APP_PROTO_ID
 type ClientProtocol struct {
 	ops          *list2.List
 	count        int
-	protoManager tcpChannel.ProtoListenerInterface
+	protocolAPI  tcpChannel.ProtocolAPI
 	proper       *ProposerProtocol
 	currentTerm  uint32
 	lastProposed *PaxosMsg
@@ -30,14 +31,13 @@ type ClientProtocol struct {
 	start        int64
 }
 
-func NewClientProtocol(listenerInterface tcpChannel.ProtoListenerInterface, proposer *ProposerProtocol, address string) *ClientProtocol {
+func NewClientProtocol(proposer *ProposerProtocol, address string) *ClientProtocol {
 	return &ClientProtocol{
-		ops:          list2.New(),
-		protoManager: listenerInterface,
-		count:        0,
-		proper:       proposer,
-		currentTerm:  uint32(1),
-		self:         address,
+		ops:         list2.New(),
+		count:       0,
+		proper:      proposer,
+		currentTerm: uint32(1),
+		self:        address,
 	}
 }
 func (c *ClientProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
@@ -74,7 +74,7 @@ func (c *ClientProtocol) handleTimer(handlerId int, sourceProto tcpChannel.APP_P
 	c.lastProposed = msg
 	log.Println("----------------------------------------------------------------------------------------------- timer triggereed")
 	f := SendPaxosRequest
-	err2 := c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, msg, f) //registar no server
+	err2 := c.protocolAPI.SendLocalEvent(PROPOSER_PROTO_ID, msg, f) //registar no server
 	log.Println("ERROR REGISTERING PROTO", err2)
 }
 
@@ -123,11 +123,11 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 			if c.lastProposed != nil {
 				c.lastProposed.term = c.currentTerm
 				c.lastProposed.proposalNum = value.proposalNum
-				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, c.lastProposed, SendPaxosRequest) //registar no server
+				_ = c.protocolAPI.SendLocalEvent(PROPOSER_PROTO_ID, c.lastProposed, SendPaxosRequest) //registar no server
 			}
 
 			if c.lastProposed == nil {
-				_ = c.protoManager.SendLocalEvent(c.ProtocolUniqueId(), PROPOSER_PROTO_ID, &PaxosMsg{term: c.currentTerm, msgId: "", proposalNum: value.proposalNum}, SendPaxosRequest)
+				_ = c.protocolAPI.SendLocalEvent(PROPOSER_PROTO_ID, &PaxosMsg{term: c.currentTerm, msgId: "", proposalNum: value.proposalNum}, SendPaxosRequest)
 			}
 
 			//log.Println("MAP ----- ++++ ", c.self, c.appendMap())
@@ -136,22 +136,23 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 	}
 }
 
-func (c *ClientProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
+func (c *ClientProtocol) OnStart(protocolAPI tcpChannel.ProtocolAPI) {
+	c.protocolAPI = protocolAPI
 	time.Sleep(time.Second * 5)
-	channelInterface.OpenConnection("127.0.0.1", 8080, c.ProtocolUniqueId())
-	channelInterface.OpenConnection("127.0.0.1", 8081, c.ProtocolUniqueId())
-	channelInterface.OpenConnection("127.0.0.1", 8082, c.ProtocolUniqueId())
-	c.protoManager.RegisterTimeout(c.ProtocolUniqueId(), time.Second*5, nil, c.handleTimer)
-	timerId := c.protoManager.RegisterPeriodicTimeout(c.ProtocolUniqueId(), time.Second*30, nil, c.PeriodicTimerHandler)
-	log.Println("REGISTERED TIME ID IS : ", timerId)
+	protocolAPI.NetworkInterface().OpenConnection("127.0.0.1", 8080, c.ProtocolUniqueId())
+	protocolAPI.NetworkInterface().OpenConnection("127.0.0.1", 8081, c.ProtocolUniqueId())
+	protocolAPI.NetworkInterface().OpenConnection("127.0.0.1", 8082, c.ProtocolUniqueId())
+	protocolAPI.RegisterTimeout(time.Second*5, nil, c.handleTimer)
+	timerId, err := protocolAPI.RegisterPeriodicTimeout(time.Second*30, nil, c.PeriodicTimerHandler)
+	log.Println("REGISTERED TIME ID IS : ", timerId, err)
 }
-func (c *ClientProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
+func (c *ClientProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ProtocolAPI) {
 
 }
-func (c *ClientProtocol) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (c *ClientProtocol) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	log.Println("CONNECTION IS UPP")
 }
-func (c *ClientProtocol) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (c *ClientProtocol) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	log.Println("CONNECTION IS down")
 
 }

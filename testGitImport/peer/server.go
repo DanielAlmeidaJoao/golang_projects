@@ -22,10 +22,10 @@ func main() {
 	//fmt.Println(protocolsManager)
 	fmt.Println(protocolsManager)
 
-	proposer := paxos.NewProposerProtocol(protocolsManager, selfAddress)
-	client := paxos.NewClientProtocol(protocolsManager, proposer, selfAddress)
-	acceptor := paxos.NewAcceptorProtocol(protocolsManager, selfAddress)
-	learner := paxos.NewLearnerProtocol(protocolsManager, selfAddress)
+	proposer := paxos.NewProposerProtocol(selfAddress)
+	client := paxos.NewClientProtocol(proposer, selfAddress)
+	acceptor := paxos.NewAcceptorProtocol(selfAddress)
+	learner := paxos.NewLearnerProtocol(selfAddress)
 
 	//networkQueueSize int, timeoutQueueSize int, localCommQueueSize int
 	protocolsManager.StartProtocol(proposer, 100, 50, 20)

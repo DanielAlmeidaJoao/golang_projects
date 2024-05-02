@@ -16,7 +16,7 @@ type ProposerProtocol struct {
 	acks             uint32    //number of acks received from acceptors
 	promises         int       //promises received from acceptors
 	peers            map[string]*tcpChannel.CustomConnection
-	ProtoManager     tcpChannel.ProtoListenerInterface
+	ProtoAPI         tcpChannel.ProtocolAPI
 	currentTerm      uint32
 	self             string
 	rd               *rand.Rand
@@ -25,12 +25,11 @@ type ProposerProtocol struct {
 	acceptValueCount *PaxosMsg
 }
 
-func NewProposerProtocol(listenerInterface tcpChannel.ProtoListenerInterface, address string) *ProposerProtocol {
+func NewProposerProtocol(address string) *ProposerProtocol {
 	return &ProposerProtocol{
-		ProtoManager: listenerInterface,
-		currentTerm:  1,
-		self:         address,
-		promises:     0,
+		currentTerm: 1,
+		self:        address,
+		promises:    0,
 	}
 }
 
@@ -38,13 +37,17 @@ func (p *ProposerProtocol) OnProposeClientCall(clientValue *PaxosMsg) {
 	p.currentTerm = clientValue.term
 	if clientValue.msgId == "" {
 		p.value = nil
-		p.ProtoManager.CancelTimer(p.timerId)
+		p.ProtoAPI.CancelTimer(p.timerId)
 		p.timerId = -1
 		return
 	}
 
 	if p.timerId <= 0 {
-		p.timerId = p.ProtoManager.RegisterPeriodicTimeout(p.ProtocolUniqueId(), time.Millisecond*time.Duration(150+p.rd.Intn(500)), nil, p.PeriodicTimerHandler)
+		var err error
+		p.timerId, err = p.ProtoAPI.RegisterPeriodicTimeout(time.Millisecond*time.Duration(150+p.rd.Intn(500)), nil, p.PeriodicTimerHandler)
+		if err != nil {
+			log.Panic("ERROR REGISTERING TIMER: ", err)
+		}
 	}
 	// ola
 	//aux := len(p.peers) // time.Now().Nanosecond() %
@@ -70,7 +73,7 @@ func (c *ProposerProtocol) PeriodicTimerHandler(handlerId int, proto tcpChannel.
 		c.OnProposeClientCall(c.value)
 	} else {
 		c.timerId = -1
-		c.ProtoManager.CancelTimer(handlerId)
+		c.ProtoAPI.CancelTimer(handlerId)
 	}
 }
 
@@ -88,13 +91,16 @@ func (p *ProposerProtocol) setPromiseValue(accepted_value *PaxosMsg) {
 		}
 	}
 }
+func pp() tcpChannel.ProtoInterface {
+	return &ProposerProtocol{}
+}
 
 /*
 *
 This function is called when the proposer receives a promise message from one of the acceptors.
 */
-func onPromise(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
-	p, ok := protoInterface.(*ProposerProtocol)
+func onPromise(protoInterface tcpChannel.ProtocolAPI, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	p, ok := protoInterface.SelfProtocol().(*ProposerProtocol)
 	if !ok {
 		return
 	}
@@ -133,8 +139,8 @@ func onPromise(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.
 This function is called when the proposer receives an accepted message from one of the acceptors.
 */
 
-func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
-	p, ok := protoInterface.(*ProposerProtocol)
+func onAccepted(protoInterface tcpChannel.ProtocolAPI, customConn *tcpChannel.CustomConnection, protoSource tcpChannel.APP_PROTO_ID, data *tcpChannel.CustomReader) {
+	p, ok := protoInterface.SelfProtocol().(*ProposerProtocol)
 	if !ok {
 		return
 	}
@@ -158,25 +164,26 @@ func onAccepted(protoInterface tcpChannel.ProtoInterface, customConn *tcpChannel
 func (a *ProposerProtocol) ProtocolUniqueId() tcpChannel.APP_PROTO_ID {
 	return PROPOSER_PROTO_ID
 }
-func (a *ProposerProtocol) OnStart(channelInterface tcpChannel.ChannelInterface) {
+func (a *ProposerProtocol) OnStart(protocolAPI tcpChannel.ProtocolAPI) {
+	a.ProtoAPI = protocolAPI
 	a.rd = rand.New(rand.NewSource(time.Now().UnixNano()))
-	//err1 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
-	err2 := a.ProtoManager.RegisterNetworkMessageHandler(ON_PROMISE_ID, onPromise)   //registar no server
-	err3 := a.ProtoManager.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, onAccepted) //registar no server
+	//err1 := a.ProtoAPI.RegisterNetworkMessageHandler(ON_PROPOSE_ID, a.onPropose)   //registar no server
+	err2 := a.ProtoAPI.RegisterNetworkMessageHandler(ON_PROMISE_ID, onPromise)   //registar no server
+	err3 := a.ProtoAPI.RegisterNetworkMessageHandler(ON_ACCEPTED_ID, onAccepted) //registar no server
 	log.Println("---- OKKK  IS : ", a)
 
 	log.Println("REGISTER MSG HANDLERS: ", err2, err3)
 }
-func (a *ProposerProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ChannelInterface) {
+func (a *ProposerProtocol) OnMessageArrival(customCon *tcpChannel.CustomConnection, source, destProto tcpChannel.APP_PROTO_ID, msg []byte, channelInterface tcpChannel.ProtocolAPI) {
 	fmt.Println("MESSAGE ARRIVED MESSAGE ARRIVEE!!")
 }
-func (a *ProposerProtocol) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (a *ProposerProtocol) ConnectionUp(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	if a.peers == nil {
 		a.peers = make(map[string]*tcpChannel.CustomConnection)
 	}
 	a.peers[customCon.RemoteAddress().String()] = customCon
 	log.Println("CONNECTION IS UP", customCon.GetConnectionKey(), customCon.RemoteAddress())
 }
-func (a *ProposerProtocol) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ChannelInterface) {
+func (a *ProposerProtocol) ConnectionDown(customCon *tcpChannel.CustomConnection, channelInterface tcpChannel.ProtocolAPI) {
 	log.Println("CONNECTION DOWN", customCon.GetConnectionKey(), customCon.RemoteAddress())
 }
