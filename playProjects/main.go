@@ -6,7 +6,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"log"
+	"math/rand"
 	"net"
+	"time"
 )
 
 func sayBlalalal() {
@@ -234,4 +236,12 @@ func main() {
 	//testLogTrace()
 	//testList()
 	//testAddressesDifs()
+	rd := rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	fmt.Println(rd.Intn(time.Now().Nanosecond()))
+	fmt.Println(rd.Intn(time.Now().Nanosecond()))
+	fmt.Println(rd.Intn(time.Now().Nanosecond()))
+	fmt.Println(rd.Intn(time.Now().Nanosecond()))
+	fmt.Println(rd.Intn(time.Now().Nanosecond()))
+
 }

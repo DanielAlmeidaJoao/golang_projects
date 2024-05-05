@@ -56,11 +56,11 @@ func SendPaxosRequest(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.
 }
 func (c *ClientProtocol) nextProposal() *PaxosMsg {
 	if c.start == 0 {
-		c.start = time.Now().UnixNano()
+		c.start = time.Now().UnixMilli()
 	}
 	c.count++
-	if c.count > 200000 {
-		log.Println(c.self, " -- ELAPSED IS -- : ", time.Now().UnixNano()-c.start)
+	if c.count > 100000 {
+		log.Println(c.self, " -- ELAPSED IS -- : ", time.Now().UnixMilli()-c.start)
 		return nil
 	}
 	return &PaxosMsg{
