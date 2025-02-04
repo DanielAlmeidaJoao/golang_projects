@@ -59,8 +59,7 @@ func (c *ClientProtocol) nextProposal() *PaxosMsg {
 		c.start = time.Now().UnixMilli()
 	}
 	c.count++
-	if c.count > 100000 {
-		log.Println(c.self, " -- ELAPSED IS -- : ", time.Now().UnixMilli()-c.start)
+	if c.count > 1000 {
 		return nil
 	}
 	return &PaxosMsg{
@@ -116,7 +115,9 @@ func ValueDecided(sourceProto tcpChannel.APP_PROTO_ID, destProto tcpChannel.Prot
 				c.currentTerm += 1
 			}
 			c.ops.PushBack(value)
-
+			if c.ops.Len() == 3000 {
+				log.Println(c.self, " -- ELAPSED IS -- : ", time.Now().UnixMilli()-c.start)
+			}
 			if c.lastProposed != nil && value.msgId == c.lastProposed.msgId {
 				c.lastProposed = c.nextProposal()
 			}
